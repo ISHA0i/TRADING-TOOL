@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+# Set numpy NaN value explicitly
+np.nan  # Use this instead of NaN
 import pandas_ta as ta
 
 def calculate_all(data):

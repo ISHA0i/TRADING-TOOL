@@ -1,7 +1,6 @@
 fastapi==0.110.0
 uvicorn==0.28.0
-pandas==1.5.3
-numpy==1.24.3
+# pandas and numpy are installed separately
 yfinance==0.2.37
 # TA-Lib requires separate installation, see README
 # ta-lib==0.4.28
