@@ -41,7 +41,8 @@ def get_market_data(ticker, timeframe="1d", period="1y"):
             data = data[['Date', 'Open', 'High', 'Low', 'Close']]
             data['Volume'] = 0
         
-        # Remove rows with NaN values
+        # Remove rows with NaN values - use np.nan explicitly
+        data = data.replace([np.nan, None, float('nan')], np.nan)
         data = data.dropna()
         
         return data

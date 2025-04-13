@@ -11,7 +11,7 @@ const API_URL = 'http://localhost:8000';
  */
 export const analyzeTicker = async (ticker, timeframe = '1d', period = '1y', capital = 10000) => {
   try {
-    const response = await fetch(`${API_URL}/analyze`, {
+    const response = await fetch(`http://localhost:8000/analyze`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
