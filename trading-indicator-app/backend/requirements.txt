@@ -1,0 +1,11 @@
+fastapi==0.110.0
+uvicorn==0.28.0
+pandas==1.5.3
+numpy==1.24.3
+yfinance==0.2.37
+# TA-Lib requires separate installation, see README
+# ta-lib==0.4.28
+pandas-ta==0.3.14b0
+pydantic==2.6.3
+requests==2.31.0
+python-dateutil==2.8.2 
