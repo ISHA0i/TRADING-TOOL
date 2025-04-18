@@ -11,17 +11,11 @@ const API_URL = 'http://localhost:8000';
  */
 export const analyzeTicker = async (ticker, timeframe = '1d', period = '1y', capital = 10000) => {
   try {
-    const response = await fetch(`http://localhost:8000/analyze`, {
+    const response = await fetch(`${API_URL}/api/analyze/${ticker}?timeframe=${timeframe}&period=${period}&capital=${capital}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        ticker,
-        timeframe,
-        period,
-        capital,
-      }),
+      }
     });
     
     if (!response.ok) {
@@ -44,7 +38,7 @@ export const analyzeTicker = async (ticker, timeframe = '1d', period = '1y', cap
  */
 export const checkApiStatus = async () => {
   try {
-    const response = await fetch(`${API_URL}/`);
+    const response = await fetch(`${API_URL}/api`);
     
     if (!response.ok) {
       throw new Error(`API status check failed with status: ${response.status}`);
@@ -55,4 +49,4 @@ export const checkApiStatus = async () => {
     console.error('API status check error:', error);
     throw error;
   }
-}; 
+};

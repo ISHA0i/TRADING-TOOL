@@ -2,6 +2,11 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def get_market_data(ticker, timeframe="1d", period="1y"):
     """
@@ -16,13 +21,21 @@ def get_market_data(ticker, timeframe="1d", period="1y"):
         Pandas dataframe with OHLCV data
     """
     try:
+        logger.info(f"Fetching data for {ticker} with timeframe={timeframe}, period={period}")
+        
         # For intraday data, period is limited
         if timeframe in ["1m", "5m", "15m", "30m", "1h"]:
             if period not in ["1d", "5d", "1mo"]:
                 period = "5d"  # Default to 5 days for intraday data
+                logger.warning(f"Adjusted period to 5d for intraday timeframe {timeframe}")
         
         # Fetch data
-        data = yf.Ticker(ticker).history(period=period, interval=timeframe)
+        ticker_obj = yf.Ticker(ticker)
+        data = ticker_obj.history(period=period, interval=timeframe)
+        
+        if data.empty:
+            logger.error(f"No data returned for {ticker}")
+            return pd.DataFrame()
         
         # Rename columns to standard format
         data.columns = [col.title() for col in data.columns]
@@ -37,18 +50,19 @@ def get_market_data(ticker, timeframe="1d", period="1y"):
         if 'Volume' in data.columns:
             data = data[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']]
         else:
-            # Some data might not have volume
+            logger.warning(f"No volume data for {ticker}, using 0")
             data = data[['Date', 'Open', 'High', 'Low', 'Close']]
             data['Volume'] = 0
         
-        # Remove rows with NaN values - use np.nan explicitly
-        data = data.replace([np.nan, None, float('nan')], np.nan)
+        # Remove rows with NaN values
+        data = data.replace([np.inf, -np.inf], np.nan)
         data = data.dropna()
         
+        logger.info(f"Successfully fetched {len(data)} rows of data for {ticker}")
         return data
     
     except Exception as e:
-        print(f"Error fetching data for {ticker}: {str(e)}")
+        logger.error(f"Error fetching data for {ticker}: {str(e)}")
         return pd.DataFrame()
 
 def get_multiple_tickers(tickers, timeframe="1d", period="1y"):
@@ -88,4 +102,4 @@ def get_sp500_tickers():
     
     except Exception as e:
         print(f"Error fetching S&P 500 tickers: {str(e)}")
-        return [] 
+        return []

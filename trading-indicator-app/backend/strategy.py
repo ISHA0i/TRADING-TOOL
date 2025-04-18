@@ -208,36 +208,36 @@ def check_volume_signals(df, signals):
         signals['confidence'] *= 1.3
     
     # OBV trend with multiple timeframes
-    obv_short_term = df['OBV'].iloc[-5:].mean() > df['OBV'].iloc[-10:-5].mean()
-    obv_medium_term = df['OBV'].iloc[-20:].mean() > df['OBV'].iloc[-40:-20].mean()
+    obv_short_trend = float(df['OBV'].iloc[-5:].mean() > df['OBV'].iloc[-10:-5].mean())
+    obv_medium_trend = float(df['OBV'].iloc[-20:].mean() > df['OBV'].iloc[-40:-20].mean())
     obv_slope = (df['OBV'].iloc[-1] - df['OBV'].iloc[-5]) / 5
     
-    if obv_short_term and obv_medium_term and obv_slope > 0:
+    if obv_short_trend > 0 and obv_medium_trend > 0 and obv_slope > 0:
         volume_signals.append("OBV trending up in both short and medium term")
         signals['confidence'] += 0.25
-    elif not obv_short_term and not obv_medium_term and obv_slope < 0:
+    elif obv_short_trend == 0 and obv_medium_trend == 0 and obv_slope < 0:
         volume_signals.append("OBV trending down in both short and medium term")
         signals['confidence'] -= 0.25
     
     # Chaikin Money Flow with trend confirmation
-    cmf_short_term = df['CMF'].iloc[-5:].mean() > df['CMF'].iloc[-10:-5].mean()
-    cmf_medium_term = df['CMF'].iloc[-20:].mean() > df['CMF'].iloc[-40:-20].mean()
+    cmf_short_trend = float(df['CMF'].iloc[-5:].mean() > df['CMF'].iloc[-10:-5].mean())
+    cmf_medium_trend = float(df['CMF'].iloc[-20:].mean() > df['CMF'].iloc[-40:-20].mean())
     
-    if latest['CMF'] > 0.1 and cmf_short_term and cmf_medium_term:
+    if latest['CMF'] > 0.1 and cmf_short_trend > 0 and cmf_medium_trend > 0:
         volume_signals.append(f"Strong buying pressure with increasing CMF in both timeframes: {latest['CMF']:.2f}")
         signals['confidence'] += 0.3
-    elif latest['CMF'] < -0.1 and not cmf_short_term and not cmf_medium_term:
+    elif latest['CMF'] < -0.1 and cmf_short_trend == 0 and cmf_medium_trend == 0:
         volume_signals.append(f"Strong selling pressure with decreasing CMF in both timeframes: {latest['CMF']:.2f}")
         signals['confidence'] -= 0.3
     
     # Volume Weighted MACD confirmation
-    vmacd_short_term = df['VMACD'].iloc[-5:].mean() > df['VMACD'].iloc[-10:-5].mean()
-    vmacd_medium_term = df['VMACD'].iloc[-20:].mean() > df['VMACD'].iloc[-40:-20].mean()
+    vmacd_short_trend = float(df['VMACD'].iloc[-5:].mean() > df['VMACD'].iloc[-10:-5].mean())
+    vmacd_medium_trend = float(df['VMACD'].iloc[-20:].mean() > df['VMACD'].iloc[-40:-20].mean())
     
-    if latest['VMACD'] > latest['VMACD_signal'] and latest['VMACD_hist'] > 0 and vmacd_short_term and vmacd_medium_term:
+    if latest['VMACD'] > latest['VMACD_signal'] and latest['VMACD_hist'] > 0 and vmacd_short_trend > 0 and vmacd_medium_trend > 0:
         volume_signals.append("Volume-weighted MACD bullish in both timeframes")
         signals['confidence'] += 0.2
-    elif latest['VMACD'] < latest['VMACD_signal'] and latest['VMACD_hist'] < 0 and not vmacd_short_term and not vmacd_medium_term:
+    elif latest['VMACD'] < latest['VMACD_signal'] and latest['VMACD_hist'] < 0 and vmacd_short_trend == 0 and vmacd_medium_trend == 0:
         volume_signals.append("Volume-weighted MACD bearish in both timeframes")
         signals['confidence'] -= 0.2
     
@@ -246,12 +246,12 @@ def check_volume_signals(df, signals):
     
     # Add volume metrics to signals for position sizing
     signals['volume_metrics'] = {
-        'short_term_trend': short_term_trend,
-        'medium_term_trend': medium_term_trend,
-        'volume_momentum': volume_momentum,
-        'obv_trend': obv_short_term and obv_medium_term,
-        'cmf_trend': cmf_short_term and cmf_medium_term,
-        'vmacd_trend': vmacd_short_term and vmacd_medium_term
+        'short_term_trend': float(short_term_trend),
+        'medium_term_trend': float(medium_term_trend),
+        'volume_momentum': float(volume_momentum),
+        'obv_trend': bool(obv_short_trend and obv_medium_trend),
+        'cmf_trend': bool(cmf_short_trend and cmf_medium_trend),
+        'vmacd_trend': bool(vmacd_short_trend and vmacd_medium_trend)
     }
     
     return signals
@@ -260,34 +260,37 @@ def check_pattern_signals(df, signals):
     """Check for candlestick and chart patterns"""
     latest = df.iloc[-1]
     
-    # Candlestick patterns
-    if latest['CDL_HAMMER'] > 0:
-        signals['patterns'].append("Hammer pattern (bullish)")
-        signals['confidence'] += 0.2
-    elif latest['CDL_HAMMER'] < 0:
-        signals['patterns'].append("Inverted Hammer pattern (bearish)")
-        signals['confidence'] -= 0.2
+    # Candlestick patterns - handle possible NaN or None values
+    if latest.get('CDL_HAMMER', 0) != 0:
+        signals['patterns'].append("Hammer pattern (bullish)" if latest['CDL_HAMMER'] > 0 else "Inverted Hammer pattern (bearish)")
+        signals['confidence'] += 0.2 if latest['CDL_HAMMER'] > 0 else -0.2
     
-    if latest['CDL_ENGULFING'] > 0:
-        signals['patterns'].append("Bullish Engulfing pattern")
-        signals['confidence'] += 0.25
-    elif latest['CDL_ENGULFING'] < 0:
-        signals['patterns'].append("Bearish Engulfing pattern")
-        signals['confidence'] -= 0.25
+    if latest.get('CDL_ENGULFING', 0) != 0:
+        signals['patterns'].append("Bullish Engulfing pattern" if latest['CDL_ENGULFING'] > 0 else "Bearish Engulfing pattern")
+        signals['confidence'] += 0.25 if latest['CDL_ENGULFING'] > 0 else -0.25
     
-    if latest['CDL_MORNING_STAR'] > 0:
+    if latest.get('CDL_MORNING_STAR', 0) > 0:
         signals['patterns'].append("Morning Star pattern (bullish)")
         signals['confidence'] += 0.3
-    elif latest['CDL_EVENING_STAR'] > 0:
+    
+    if latest.get('CDL_EVENING_STAR', 0) > 0:
         signals['patterns'].append("Evening Star pattern (bearish)")
         signals['confidence'] -= 0.3
+    
+    # Doji pattern
+    if latest.get('CDL_DOJI', 0) > 0:
+        signals['patterns'].append("Doji pattern (indecision)")
+        # Reduce confidence since Doji indicates uncertainty
+        signals['confidence'] *= 0.9
     
     # Fibonacci levels
     current_price = latest['Close']
     for level in [0.236, 0.382, 0.5, 0.618, 0.786]:
-        fib_level = latest[f'FIB_{level}']
-        if abs(current_price - fib_level) / current_price < 0.01:  # Within 1% of level
-            signals['reasons'].append(f"Price near Fibonacci {level*100}% level")
+        fib_key = f'FIB_{level}'
+        if fib_key in latest and pd.notna(latest[fib_key]):
+            fib_level = latest[fib_key]
+            if abs(current_price - fib_level) / current_price < 0.01:  # Within 1% of level
+                signals['reasons'].append(f"Price near Fibonacci {level*100}% level")
     
     return signals
 
@@ -410,4 +413,4 @@ def calculate_risk_reward_levels(df, signals):
         signals['stop_loss'] = round(latest['Close'] + (stop_multiple * atr), 2)
         signals['take_profit'] = round(latest['Close'] - (target_multiple * atr), 2)
     
-    return signals 
+    return signals

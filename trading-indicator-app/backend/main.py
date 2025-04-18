@@ -1,14 +1,27 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 import uvicorn
-from pydantic import BaseModel
+from typing import Optional
+import logging
+import traceback
+import json
+import numpy as np
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 try:
     import indicators
     import strategy
     import capital_manager
     from utils import fetch_data
 except ImportError as e:
-    print(f"Import error: {e}")
+    logger.error(f"Import error: {e}")
     print("Using mock implementations for demo purposes")
     # Create mock implementations for demo purposes
     class MockModule:
@@ -60,7 +73,63 @@ except ImportError as e:
     capital_manager = MockModule()
     fetch_data = MockModule()
 
-app = FastAPI(title="Trading Indicator API")
+class NumpyJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder for numpy types"""
+    def default(self, obj):
+        try:
+            import numpy as np
+            import pandas as pd
+            
+            if isinstance(obj, (float, np.floating)):
+                # Convert NaN, inf, -inf to None
+                if np.isnan(obj) or not np.isfinite(obj):
+                    return None
+                return float(obj)
+            elif isinstance(obj, (int, np.integer)):
+                return int(obj)
+            elif isinstance(obj, np.bool_):
+                return bool(obj)
+            elif isinstance(obj, np.ndarray):
+                return [self.default(x) for x in obj.tolist()]
+            elif isinstance(obj, pd.Series):
+                return [self.default(x) for x in obj.values]
+            elif isinstance(obj, pd.DataFrame):
+                # Convert DataFrame to records, handling NaN values
+                return obj.replace({np.nan: None}).to_dict('records')
+            elif isinstance(obj, pd.Timestamp):
+                return obj.isoformat()
+            
+            # Let the base class handle anything else
+            return super().default(obj)
+            
+        except Exception as e:
+            # If all else fails, convert to None
+            if isinstance(obj, (float, np.floating)) and (np.isnan(obj) or not np.isfinite(obj)):
+                return None
+            try:
+                return str(obj)
+            except:
+                return None
+
+# Create a custom JSONResponse class that uses our encoder
+from starlette.responses import JSONResponse
+
+class CustomJSONResponse(JSONResponse):
+    def render(self, content) -> bytes:
+        return json.dumps(
+            content,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=None,
+            separators=(",", ":"),
+            cls=NumpyJSONEncoder,
+        ).encode("utf-8")
+
+# Create the main FastAPI app
+app = FastAPI(
+    title="Trading Indicator API",
+    default_response_class=CustomJSONResponse
+)
 
 # Enable CORS
 app.add_middleware(
@@ -72,40 +141,115 @@ app.add_middleware(
 )
 
 class AnalysisRequest(BaseModel):
-    ticker: str
-    timeframe: str = "1d"
-    period: str = "1y"
-    capital: float = 10000.0
+    ticker: str = Field(..., description="Stock symbol to analyze")
+    timeframe: str = Field(default="1d", description="Time frame for analysis (1m, 5m, 15m, 30m, 1h, 1d, 1wk, 1mo)")
+    period: str = Field(default="1y", description="Historical data period (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, max)")
+    capital: float = Field(default=10000.0, description="Available capital for trading")
 
 @app.get("/")
 async def root():
     return {"message": "Trading Indicator API is running"}
 
-@app.post("/analyze")
-async def analyze_ticker(request: AnalysisRequest):
+@app.get("/api/analyze/{ticker}")
+@app.post("/api/analyze/{ticker}")
+async def analyze_ticker(
+    ticker: str,
+    timeframe: str = Query(default="1d", description="Time frame for analysis"),
+    period: str = Query(default="1y", description="Historical data period"),
+    capital: float = Query(default=10000.0, description="Available capital")
+):
     try:
+        logger.info(f"Analyzing {ticker} with timeframe={timeframe}, period={period}, capital={capital}")
+        
         # Fetch market data
-        data = fetch_data.get_market_data(request.ticker, request.timeframe, request.period)
+        data = fetch_data.get_market_data(ticker, timeframe, period)
+        if data.empty:
+            logger.error(f"No data found for ticker {ticker}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"No data found for ticker {ticker}. Please verify the symbol and try again."
+            )
+        
+        # Pre-process data to handle NaN values
+        data = data.replace([np.inf, -np.inf], np.nan)
+        data = data.fillna(method='ffill').fillna(method='bfill')
         
         # Calculate technical indicators
-        indicators_data = indicators.calculate_all(data)
+        try:
+            logger.debug(f"Calculating indicators for {ticker}")
+            indicators_data = indicators.calculate_all(data)
+            if indicators_data is None:
+                raise ValueError("Indicator calculation returned None")
+                
+            # Clean up any remaining NaN values after indicator calculation
+            indicators_data = indicators_data.replace([np.inf, -np.inf], np.nan)
+            indicators_data = indicators_data.fillna(method='ffill').fillna(method='bfill')
+            
+        except Exception as e:
+            logger.error(f"Error calculating indicators: {str(e)}\n{traceback.format_exc()}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error calculating technical indicators: {str(e)}"
+            )
         
         # Generate trading signals
-        signals = strategy.generate_signals(indicators_data)
+        try:
+            logger.debug(f"Generating signals for {ticker}")
+            signals = strategy.generate_signals(indicators_data)
+            if signals is None:
+                raise ValueError("Signal generation returned None")
+            
+            # Clean up any NaN values in signals
+            signals = {k: (None if isinstance(v, float) and (np.isnan(v) or not np.isfinite(v)) else v) 
+                      for k, v in signals.items()}
+            
+        except Exception as e:
+            logger.error(f"Error generating signals: {str(e)}\n{traceback.format_exc()}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error generating trading signals: {str(e)}"
+            )
         
         # Calculate risk and position sizing
-        capital_plan = capital_manager.calculate_position(
-            signals, request.capital, data.iloc[-1]['Close']
-        )
+        try:
+            logger.debug(f"Calculating position size for {ticker}")
+            capital_plan = capital_manager.calculate_position(
+                signals, capital, float(indicators_data.iloc[-1]['Close'])
+            )
+            if capital_plan is None:
+                raise ValueError("Position calculation returned None")
+                
+            # Clean up any NaN values in capital plan
+            capital_plan = {k: (None if isinstance(v, float) and (np.isnan(v) or not np.isfinite(v)) else v) 
+                          for k, v in capital_plan.items()}
+            
+        except Exception as e:
+            logger.error(f"Error calculating position size: {str(e)}\n{traceback.format_exc()}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error calculating position size: {str(e)}"
+            )
         
-        return {
-            "ticker": request.ticker,
-            "last_price": float(data.iloc[-1]['Close']),
+        # Prepare the response with cleaned data
+        response = {
+            "ticker": ticker,
+            "last_price": float(indicators_data.iloc[-1]['Close']),
             "signals": signals,
-            "capital_plan": capital_plan
+            "capital_plan": capital_plan,
+            "historical_data": indicators_data.tail(50).replace({np.nan: None}).to_dict('records')
         }
+        
+        logger.info(f"Successfully analyzed {ticker}")
+        return response
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error analyzing {ticker}: {str(e)}\n{traceback.format_exc()}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"An unexpected error occurred while analyzing {ticker}: {str(e)}"
+        )
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True) 
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")

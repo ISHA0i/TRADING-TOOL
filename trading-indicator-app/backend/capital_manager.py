@@ -35,12 +35,21 @@ def calculate_position(signals, capital, current_price):
     if signal_type == "NEUTRAL" or stop_loss is None:
         return capital_plan
     
-    # Calculate market conditions
+    # Calculate market conditions with safe division
+    bb_upper = signals.get('BB_upper', current_price)
+    bb_lower = signals.get('BB_lower', current_price)
+    bb_range = bb_upper - bb_lower
+    
+    # Safe calculation of BB position with fallback to 0.5 for zero range
+    if bb_range != 0:
+        bb_position = (current_price - bb_lower) / bb_range
+    else:
+        bb_position = 0.5  # Neutral position when range is zero
+    
     market_conditions = {
         'rsi': signals.get('RSI14', 50),
         'macd_hist': signals.get('MACD_hist', 0),
-        'bb_position': (current_price - signals.get('BB_lower', current_price)) / 
-                      (signals.get('BB_upper', current_price) - signals.get('BB_lower', current_price)),
+        'bb_position': bb_position,
         'volume_ratio': signals.get('volume_ratio', 1.0),
         'obv_trend': 1 if signals.get('OBV_trend', False) else -1,
         'cmf': signals.get('CMF', 0)
@@ -281,4 +290,4 @@ def calculate_portfolio_risk(positions, total_capital):
         'portfolio_risk_percent': round(portfolio_risk_percent, 2),
         'position_risks': position_risks,
         'max_drawdown': round(max_drawdown, 2)
-    } 
+    }
