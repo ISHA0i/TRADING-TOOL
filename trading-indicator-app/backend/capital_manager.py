@@ -1,16 +1,8 @@
 def calculate_position(signals, capital, current_price):
     """
-    Calculate position size, risk management, and capital allocation
-    
-    Args:
-        signals: Dictionary containing signal data
-        capital: Total capital available
-        current_price: Current asset price
-        
-    Returns:
-        Dictionary with position sizing and risk management details
+    Calculate position size, risk management, and capital allocation with enhanced accuracy
     """
-    # Initialize capital management plan
+    # Initialize capital management plan with added metrics
     capital_plan = {
         "total_capital": capital,
         "risk_percent": 1.0,  # Default risk 1% of total capital
@@ -23,18 +15,68 @@ def calculate_position(signals, capital, current_price):
         "kelly_criterion": 0.0,
         "volatility_adjusted_size": 0.0,
         "portfolio_risk": 0.0,
-        "market_conditions": {}
+        "market_conditions": {},
+        "regime_adjustments": {}
     }
     
     signal_strength = signals["confidence"]
     signal_type = signals["signal"]
     stop_loss = signals["stop_loss"]
     take_profit = signals["take_profit"]
+    validation = signals.get("validation", {})
+    market_regime = signals.get("market_regime", {})
     
     # Skip if neutral signal or missing stop loss
     if signal_type == "NEUTRAL" or stop_loss is None:
         return capital_plan
 
+    # Adjust risk based on market regime
+    regime_type = market_regime.get('type', 'unknown')
+    regime_volatility = market_regime.get('volatility', 'normal')
+    regime_confidence = market_regime.get('confidence', 0.5)
+    
+    # Store regime adjustments for transparency
+    capital_plan['regime_adjustments'] = {
+        'type': regime_type,
+        'volatility': regime_volatility,
+        'base_adjustment': 0.0,
+        'volatility_adjustment': 0.0
+    }
+    
+    # Adjust base risk percent based on regime
+    if regime_type == 'trending' and regime_confidence > 0.7:
+        capital_plan["risk_percent"] = 1.2  # Increase risk in strong trends
+        capital_plan['regime_adjustments']['base_adjustment'] = 0.2
+    elif regime_type == 'ranging':
+        capital_plan["risk_percent"] = 0.8  # Reduce risk in ranging markets
+        capital_plan['regime_adjustments']['base_adjustment'] = -0.2
+    elif regime_type == 'volatile':
+        capital_plan["risk_percent"] = 0.6  # Significantly reduce risk in volatile markets
+        capital_plan['regime_adjustments']['base_adjustment'] = -0.4
+    
+    # Further adjust based on volatility
+    if regime_volatility == 'high':
+        capital_plan["risk_percent"] *= 0.8
+        capital_plan['regime_adjustments']['volatility_adjustment'] = -0.2
+    elif regime_volatility == 'low':
+        capital_plan["risk_percent"] *= 1.2
+        capital_plan['regime_adjustments']['volatility_adjustment'] = 0.2
+    
+    # Adjust position size based on validation metrics
+    if validation:
+        adjusted_confidence = validation.get('adjusted_confidence', signal_strength)
+        regime_compatibility = validation.get('regime_compatibility', 0)
+        historical_accuracy = validation.get('historical_accuracy', 0)
+        
+        # Reduce position size if validation shows concerns
+        if adjusted_confidence < signal_strength:
+            size_adjustment = adjusted_confidence / max(signal_strength, 0.1)
+            capital_plan["max_position_size_percent"] *= size_adjustment
+        
+        # Adjust based on historical accuracy
+        if historical_accuracy < 0:
+            capital_plan["risk_percent"] *= (1 + historical_accuracy)  # Reduce risk for poor historical performance
+    
     # Check if this is a crypto asset by looking for BTC price
     is_crypto = "bitcoin_price" in signals
     
@@ -48,60 +90,35 @@ def calculate_position(signals, capital, current_price):
         if any("correlation with BTC" in reason for reason in signals.get("reasons", [])):
             capital_plan["risk_percent"] = 0.75  # Reduce risk for highly correlated assets
     
-    # Calculate market conditions with safe division
-    bb_upper = signals.get('BB_upper', current_price)
-    bb_lower = signals.get('BB_lower', current_price)
-    bb_range = bb_upper - bb_lower
+    # Calculate Kelly Criterion with validation-adjusted confidence
+    win_probability = validation.get('adjusted_confidence', signal_strength)
+    risk_amount = abs(current_price - stop_loss)
+    reward_amount = abs(take_profit - current_price)
     
-    # Safe calculation of BB position with fallback to 0.5 for zero range
-    if bb_range != 0:
-        bb_position = (current_price - bb_lower) / bb_range
-    else:
-        bb_position = 0.5  # Neutral position when range is zero
+    if risk_amount > 0:
+        win_loss_ratio = reward_amount / risk_amount
+        kelly = (win_probability * (win_loss_ratio + 1) - 1) / win_loss_ratio
+        kelly = max(0, min(kelly, 0.5))  # Cap Kelly at 50%
+        capital_plan["kelly_criterion"] = round(kelly, 4)
     
-    market_conditions = {
-        'rsi': signals.get('RSI14', 50),
-        'macd_hist': signals.get('MACD_hist', 0),
-        'bb_position': bb_position,
-        'volume_ratio': signals.get('volume_ratio', 1.0),
-        'obv_trend': 1 if signals.get('OBV_trend', False) else -1,
-        'cmf': signals.get('CMF', 0)
-    }
-    capital_plan['market_conditions'] = market_conditions
-    
-    # Calculate dynamic position size
-    volatility = signals.get('ATR', 0)
-    trend_strength = signals.get('ADX', 0)
-    position_size_percent = calculate_dynamic_position_size(
-        capital, volatility, trend_strength, signal_strength, market_conditions, is_crypto
-    )
-    
-    # Calculate Kelly Criterion
-    win_probability = signal_strength
-    win_loss_ratio = 2.0
-    kelly = (win_probability * (win_loss_ratio + 1) - 1) / win_loss_ratio
-    kelly = max(0, min(kelly, 0.5))
-    capital_plan["kelly_criterion"] = round(kelly, 4)
-    
-    # Apply Kelly to position size
-    position_size_percent *= kelly
-    
-    # Calculate dollar risk amount
+    # Calculate dollar risk amount with adjusted risk percentage
     risk_amount = capital * (capital_plan["risk_percent"] / 100)
     
-    # Calculate price risk
+    # Calculate position size based on risk
     if signal_type in ["BUY", "STRONG_BUY"]:
-        price_risk_per_unit = current_price - stop_loss
-    else:
-        price_risk_per_unit = stop_loss - current_price
+        price_risk = current_price - stop_loss
+        if price_risk > 0:
+            position_size_units = risk_amount / price_risk
+            position_size_usd = position_size_units * current_price
+    else:  # SELL or STRONG_SELL
+        price_risk = stop_loss - current_price
+        if price_risk > 0:
+            position_size_units = risk_amount / price_risk
+            position_size_usd = position_size_units * current_price
     
-    # Calculate position size
-    if price_risk_per_unit > 0:
-        position_size_units = risk_amount / price_risk_per_unit
-        position_size_usd = position_size_units * current_price
-    else:
-        position_size_usd = capital * 0.02
-        position_size_units = position_size_usd / current_price
+    # Apply Kelly criterion to position size
+    position_size_usd *= kelly
+    position_size_units = position_size_usd / current_price
     
     # Apply maximum position constraint
     max_position_usd = capital * (capital_plan["max_position_size_percent"] / 100)
@@ -115,7 +132,7 @@ def calculate_position(signals, capital, current_price):
         take_profit_usd = position_size_units * take_profit
         potential_loss = position_size_usd - stop_loss_usd
         potential_profit = take_profit_usd - position_size_usd
-    else:
+    else:  # SELL or STRONG_SELL
         stop_loss_usd = position_size_units * stop_loss
         take_profit_usd = position_size_units * take_profit
         potential_loss = stop_loss_usd - position_size_usd
@@ -125,15 +142,26 @@ def calculate_position(signals, capital, current_price):
     risk_reward_ratio = potential_profit / potential_loss if potential_loss > 0 else 0
     portfolio_risk = (potential_loss / capital) * 100
     
+    # Store market conditions
+    market_conditions = {
+        'regime_type': regime_type,
+        'volatility': regime_volatility,
+        'trend_strength': market_regime.get('trend_strength', 0),
+        'historical_accuracy': validation.get('historical_accuracy', 0),
+        'volume_profile': validation.get('volume_profile_score', 0),
+        'warning_flags': validation.get('warning_flags', [])
+    }
+    
     # Update capital plan
     capital_plan.update({
         "position_size_usd": round(position_size_usd, 2),
-        "position_size_units": round(position_size_units, 8 if is_crypto else 4),  # More decimals for crypto
+        "position_size_units": round(position_size_units, 8 if is_crypto else 4),
         "stop_loss_usd": round(potential_loss, 2),
         "potential_profit_usd": round(potential_profit, 2),
         "risk_reward_ratio": round(risk_reward_ratio, 2),
         "portfolio_risk": round(portfolio_risk, 2),
-        "volatility_adjusted_size": round(position_size_percent * 100, 2)
+        "volatility_adjusted_size": round(capital_plan["max_position_size_percent"], 2),
+        "market_conditions": market_conditions
     })
     
     return capital_plan
@@ -326,4 +354,96 @@ def calculate_portfolio_risk(positions, total_capital):
         'portfolio_risk_percent': round(portfolio_risk_percent, 2),
         'position_risks': position_risks,
         'max_drawdown': round(max_drawdown, 2)
+    }
+
+def calculate_position_size(total_capital, risk_per_trade, entry_price, stop_loss, take_profit, market_regime):
+    """
+    Calculate optimal position size based on risk parameters and market conditions
+    
+    Args:
+        total_capital: Total available capital
+        risk_per_trade: Maximum risk per trade as decimal (e.g., 0.01 for 1%)
+        entry_price: Entry price of the position
+        stop_loss: Stop loss price
+        take_profit: Take profit price
+        market_regime: Market regime information
+        
+    Returns:
+        Dictionary with position sizing information
+    """
+    # Base risk amount
+    max_risk_amount = total_capital * risk_per_trade
+    
+    # Calculate risk per unit
+    risk_per_unit = abs(entry_price - stop_loss)
+    if risk_per_unit == 0:
+        return None
+    
+    # Calculate potential reward per unit
+    reward_per_unit = abs(take_profit - entry_price)
+    
+    # Base position size calculation
+    base_position_units = max_risk_amount / risk_per_unit
+    
+    # Adjust position size based on market regime
+    regime_type = market_regime.get('type', 'unknown')
+    regime_confidence = market_regime.get('confidence', 0.5)
+    volatility = market_regime.get('volatility', 'normal')
+    
+    # Position size multiplier based on market conditions
+    position_multiplier = 1.0
+    
+    # Adjust for regime type
+    if regime_type == 'trending' and regime_confidence > 0.7:
+        position_multiplier *= 1.2  # Increase size in strong trends
+    elif regime_type == 'ranging':
+        position_multiplier *= 0.8  # Reduce size in ranging markets
+    elif regime_type == 'volatile':
+        position_multiplier *= 0.6  # Significantly reduce size in volatile markets
+    
+    # Adjust for volatility
+    if volatility == 'high':
+        position_multiplier *= 0.7
+    elif volatility == 'low':
+        position_multiplier *= 1.1
+    
+    # Apply Kelly Criterion adjustment
+    win_rate = 0.5  # Default to neutral
+    if regime_confidence > 0.7:
+        win_rate = 0.65  # Higher win rate in high-confidence setups
+    
+    risk_reward_ratio = reward_per_unit / risk_per_unit if risk_per_unit > 0 else 0
+    kelly_fraction = win_rate - ((1 - win_rate) / risk_reward_ratio) if risk_reward_ratio > 0 else 0
+    kelly_fraction = max(0, min(kelly_fraction, 0.5))  # Cap at 50% of Kelly
+    
+    # Final position size calculation
+    adjusted_position_units = base_position_units * position_multiplier * kelly_fraction
+    
+    # Maximum position size constraints
+    max_position_percent = 0.1  # 10% of capital maximum
+    max_position_size = total_capital * max_position_percent
+    position_size_usd = min(adjusted_position_units * entry_price, max_position_size)
+    final_position_units = position_size_usd / entry_price
+    
+    # Calculate actual risk and potential profit
+    actual_risk_usd = final_position_units * risk_per_unit
+    potential_profit_usd = final_position_units * reward_per_unit
+    
+    return {
+        "total_capital": total_capital,
+        "risk_percent": risk_per_trade * 100,
+        "max_position_size_percent": max_position_percent * 100,
+        "position_size_usd": position_size_usd,
+        "position_size_units": final_position_units,
+        "stop_loss_usd": actual_risk_usd,
+        "potential_profit_usd": potential_profit_usd,
+        "risk_reward_ratio": risk_reward_ratio,
+        "kelly_criterion": kelly_fraction,
+        "position_multiplier": position_multiplier,
+        "regime_adjustments": {
+            "type": regime_type,
+            "confidence": regime_confidence,
+            "volatility": volatility,
+            "size_adjustment": ((position_multiplier - 1) * 100)
+        }
     }

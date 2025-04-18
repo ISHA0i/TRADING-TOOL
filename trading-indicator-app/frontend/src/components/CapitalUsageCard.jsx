@@ -13,11 +13,20 @@ const CapitalUsageCard = ({ data, symbolType }) => {
     risk_reward_ratio,
     kelly_criterion,
     volatility_adjusted_size,
-    portfolio_risk
+    portfolio_risk,
+    market_conditions,
+    regime_adjustments
   } = capital_plan;
   
-  // Format monetary values
+  // Format monetary values with K/M/B suffixes
   const formatMoney = (value) => {
+    if (value >= 1000000000) {
+      return `$${(value / 1000000000).toFixed(1)}B`;
+    } else if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(1)}M`;
+    } else if (value >= 1000) {
+      return `$${(value / 1000).toFixed(1)}K`;
+    }
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -25,23 +34,33 @@ const CapitalUsageCard = ({ data, symbolType }) => {
     }).format(value);
   };
   
-  // Format percentage
+  // Format percentage with dynamic coloring
   const formatPercent = (value) => {
-    return value.toFixed(2) + '%';
+    const color = value > 0 ? 'text-green-400' : value < 0 ? 'text-red-400' : 'text-dark-text';
+    return (
+      <span className={color}>
+        {value.toFixed(2)}%
+      </span>
+    );
   };
 
-  // Format units based on market type
+  // Format units based on market type with improved precision
   const formatUnits = (units) => {
     if (symbolType === 'forex') {
-      return units.toFixed(2) + ' lots';
+      const lots = units / 100000; // Standard lot size
+      if (lots >= 1) {
+        return `${lots.toFixed(2)} lots`;
+      } else {
+        return `${(lots * 100).toFixed(1)} mini lots`;
+      }
     } else if (symbolType === 'crypto') {
-      return units.toFixed(8) + ' coins'; // Use 8 decimals for crypto
+      if (units < 0.00000001) {
+        return '< 0.00000001 coins';
+      }
+      return `${units.toFixed(8)} coins`;
     }
-    return units.toFixed(4) + ' units';
+    return `${units.toFixed(4)} units`;
   };
-  
-  // Calculate percentage of total capital used in position
-  const capitalUsedPercent = (position_size_usd / total_capital) * 100;
 
   // Calculate market-specific metrics
   const getMarketSpecificMetrics = () => {
@@ -57,12 +76,11 @@ const CapitalUsageCard = ({ data, symbolType }) => {
         pipValue: formatMoney(pipMoneyValue)
       };
     } else if (symbolType === 'crypto') {
-      // Add crypto-specific metrics
       const btcValue = ticker.startsWith('BTC-') ? position_size_units : 
                       (position_size_usd / (signals.bitcoin_price || 0));
       return {
         btcValue: btcValue.toFixed(8),
-        dollarsPerCoin: (position_size_usd / position_size_units).toFixed(2)
+        dollarsPerCoin: (position_size_usd / position_size_units || 0).toFixed(2)
       };
     }
     return null;
@@ -70,6 +88,16 @@ const CapitalUsageCard = ({ data, symbolType }) => {
 
   const marketMetrics = getMarketSpecificMetrics();
   
+  // Calculate percentage of total capital used in position
+  const capitalUsedPercent = (position_size_usd / total_capital) * 100;
+  
+  // Get risk level color
+  const getRiskColor = (risk) => {
+    if (risk > 3) return 'text-red-500';
+    if (risk > 2) return 'text-yellow-400';
+    return 'text-dark-text';
+  };
+
   return (
     <div className="bg-dark-surface border border-dark-border rounded-lg shadow-lg p-6">
       <h2 className="text-xl font-semibold mb-4 text-dark-text">Capital Management</h2>
@@ -115,19 +143,25 @@ const CapitalUsageCard = ({ data, symbolType }) => {
               </div>
             )}
             
-            {/* Capital Usage Bar */}
+            {/* Capital Usage Bar with regime-based adjustments */}
             <div className="pt-2">
               <div className="flex justify-between mb-1">
                 <span className="text-xs text-dark-text-secondary">Capital Allocation</span>
                 <span className="text-xs text-dark-text-secondary font-semibold">
                   {formatPercent(capitalUsedPercent)}
+                  {regime_adjustments?.size_adjustment && (
+                    <span className="ml-1 text-xs">
+                      ({regime_adjustments.size_adjustment > 0 ? '+' : ''}
+                      {regime_adjustments.size_adjustment}% regime adj.)
+                    </span>
+                  )}
                 </span>
               </div>
               <div className="w-full bg-dark-surface rounded-full h-2">
                 <div 
                   className={`h-2 rounded-full ${capitalUsedPercent > max_position_size_percent ? 'bg-dark-error' : 'bg-dark-primary'}`}
                   style={{ width: `${Math.min(100, capitalUsedPercent)}%` }}
-                ></div>
+                />
               </div>
               <div className="text-xs text-dark-text-secondary mt-1">
                 Max allowed: {formatPercent(max_position_size_percent)}
@@ -161,7 +195,7 @@ const CapitalUsageCard = ({ data, symbolType }) => {
             
             <div className="flex justify-between">
               <span className="text-dark-text-secondary">Portfolio Risk</span>
-              <span className={`font-semibold ${portfolio_risk > 2 ? 'text-red-500' : 'text-dark-text'}`}>
+              <span className={`font-semibold ${getRiskColor(portfolio_risk)}`}>
                 {formatPercent(portfolio_risk)}
               </span>
             </div>
@@ -172,7 +206,7 @@ const CapitalUsageCard = ({ data, symbolType }) => {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-dark-text-secondary">Kelly Criterion</span>
-                  <span className="font-medium text-dark-text">
+                  <span className={`font-medium ${kelly_criterion > 0.5 ? 'text-green-400' : 'text-dark-text'}`}>
                     {(kelly_criterion * 100).toFixed(1)}%
                   </span>
                 </div>
@@ -186,12 +220,31 @@ const CapitalUsageCard = ({ data, symbolType }) => {
                 
                 <div className="flex justify-between">
                   <span className="text-dark-text-secondary">Risk/Reward Ratio</span>
-                  <span className="font-medium text-dark-text">
+                  <span className={`font-medium ${risk_reward_ratio >= 1.5 ? 'text-green-400' : 'text-yellow-400'}`}>
                     {risk_reward_ratio.toFixed(2)}:1
                   </span>
                 </div>
               </div>
             </div>
+
+            {/* Market Condition Adjustments */}
+            {market_conditions && Object.keys(market_conditions).length > 0 && (
+              <div className="pt-2 border-t border-dark-border">
+                <h4 className="text-sm font-medium text-dark-text mb-2">Market Conditions</h4>
+                <div className="space-y-2 text-sm">
+                  {Object.entries(market_conditions).map(([key, value]) => (
+                    <div key={key} className="flex justify-between">
+                      <span className="text-dark-text-secondary">
+                        {key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                      </span>
+                      <span className="font-medium text-dark-text">
+                        {typeof value === 'number' ? formatPercent(value * 100) : value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

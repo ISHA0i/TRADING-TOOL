@@ -1,0 +1,859 @@
+{
+  "signals": [
+    {
+      "timestamp": "2025-04-19T01:40:34.325050",
+      "signal_type": "NEUTRAL",
+      "confidence": 0.5060000000000001,
+      "adjusted_confidence": 0.5060000000000001,
+      "regime_type": "trending",
+      "validation_metrics": {
+        "original_confidence": 0.55,
+        "adjusted_confidence": 0.5060000000000001,
+        "regime_compatibility": -0.2,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": [
+          "Signal may not suit current market regime"
+        ]
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 1593.1983642578125
+    },
+    {
+      "timestamp": "2025-04-19T01:41:34.683714",
+      "signal_type": "NEUTRAL",
+      "confidence": 0.5060000000000001,
+      "adjusted_confidence": 0.5060000000000001,
+      "regime_type": "trending",
+      "validation_metrics": {
+        "original_confidence": 0.55,
+        "adjusted_confidence": 0.5060000000000001,
+        "regime_compatibility": -0.2,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": [
+          "Signal may not suit current market regime"
+        ]
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 1591.7637939453125
+    },
+    {
+      "timestamp": "2025-04-19T01:42:34.721833",
+      "signal_type": "NEUTRAL",
+      "confidence": 0.5060000000000001,
+      "adjusted_confidence": 0.5060000000000001,
+      "regime_type": "trending",
+      "validation_metrics": {
+        "original_confidence": 0.55,
+        "adjusted_confidence": 0.5060000000000001,
+        "regime_compatibility": -0.2,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": [
+          "Signal may not suit current market regime"
+        ]
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 1591.210693359375
+    },
+    {
+      "timestamp": "2025-04-19T01:43:23.744508",
+      "signal_type": "NEUTRAL",
+      "confidence": 0.46599999999999997,
+      "adjusted_confidence": 0.46599999999999997,
+      "regime_type": "trending",
+      "validation_metrics": {
+        "original_confidence": 0.5,
+        "adjusted_confidence": 0.46599999999999997,
+        "regime_compatibility": -0.16000000000000003,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": 0.0,
+        "market_context_score": -0.1,
+        "warning_flags": [
+          "Signal may not suit current market regime",
+          "High market volatility - consider reducing position size"
+        ]
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 196.97999572753906
+    },
+    {
+      "timestamp": "2025-04-19T01:43:45.103179",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84486.3984375
+    },
+    {
+      "timestamp": "2025-04-19T01:44:42.790489",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84493.7578125
+    },
+    {
+      "timestamp": "2025-04-19T01:45:42.206210",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84495.7734375
+    },
+    {
+      "timestamp": "2025-04-19T01:46:42.357758",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84495.34375
+    },
+    {
+      "timestamp": "2025-04-19T01:47:42.729792",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84500.5234375
+    },
+    {
+      "timestamp": "2025-04-19T01:48:42.229583",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84512.3046875
+    },
+    {
+      "timestamp": "2025-04-19T01:49:42.382961",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84478.609375
+    },
+    {
+      "timestamp": "2025-04-19T01:50:42.654760",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84505.2265625
+    },
+    {
+      "timestamp": "2025-04-19T01:51:42.261811",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84515.953125
+    },
+    {
+      "timestamp": "2025-04-19T01:52:42.179606",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84515.7265625
+    },
+    {
+      "timestamp": "2025-04-19T01:53:41.995993",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84500.3671875
+    },
+    {
+      "timestamp": "2025-04-19T01:54:42.295388",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84510.546875
+    },
+    {
+      "timestamp": "2025-04-19T01:55:04.906907",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84510.546875
+    },
+    {
+      "timestamp": "2025-04-19T01:56:04.161755",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84522.8203125
+    },
+    {
+      "timestamp": "2025-04-19T01:57:03.894824",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84522.8203125
+    },
+    {
+      "timestamp": "2025-04-19T01:58:04.217285",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84537.078125
+    },
+    {
+      "timestamp": "2025-04-19T01:58:37.209021",
+      "signal_type": "NEUTRAL",
+      "confidence": 0.46599999999999997,
+      "adjusted_confidence": 0.46599999999999997,
+      "regime_type": "trending",
+      "validation_metrics": {
+        "original_confidence": 0.5,
+        "adjusted_confidence": 0.46599999999999997,
+        "regime_compatibility": -0.16000000000000003,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": 0.0,
+        "market_context_score": -0.1,
+        "warning_flags": [
+          "Signal may not suit current market regime",
+          "High market volatility - consider reducing position size"
+        ]
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 196.97999572753906
+    },
+    {
+      "timestamp": "2025-04-19T01:59:36.433080",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.6324,
+      "adjusted_confidence": 0.6324,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.62,
+        "adjusted_confidence": 0.6324,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": 0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 367.7799987792969
+    },
+    {
+      "timestamp": "2025-04-19T02:00:32.691383",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.6324,
+      "adjusted_confidence": 0.6324,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.62,
+        "adjusted_confidence": 0.6324,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": 0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 367.7799987792969
+    },
+    {
+      "timestamp": "2025-04-19T02:01:32.685719",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.6324,
+      "adjusted_confidence": 0.6324,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.62,
+        "adjusted_confidence": 0.6324,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": 0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 367.7799987792969
+    },
+    {
+      "timestamp": "2025-04-19T02:02:32.351160",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.6324,
+      "adjusted_confidence": 0.6324,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.62,
+        "adjusted_confidence": 0.6324,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": 0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 367.7799987792969
+    },
+    {
+      "timestamp": "2025-04-19T02:03:32.608262",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.6324,
+      "adjusted_confidence": 0.6324,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.62,
+        "adjusted_confidence": 0.6324,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": 0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 367.7799987792969
+    },
+    {
+      "timestamp": "2025-04-19T02:04:32.264066",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.6324,
+      "adjusted_confidence": 0.6324,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.62,
+        "adjusted_confidence": 0.6324,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": 0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 367.7799987792969
+    },
+    {
+      "timestamp": "2025-04-19T02:05:32.596435",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.6324,
+      "adjusted_confidence": 0.6324,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.62,
+        "adjusted_confidence": 0.6324,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": 0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 367.7799987792969
+    },
+    {
+      "timestamp": "2025-04-19T02:05:50.028129",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84531.0
+    },
+    {
+      "timestamp": "2025-04-19T02:06:48.943851",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84535.65625
+    },
+    {
+      "timestamp": "2025-04-19T02:07:48.723115",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84533.203125
+    },
+    {
+      "timestamp": "2025-04-19T02:08:49.122821",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84534.3359375
+    },
+    {
+      "timestamp": "2025-04-19T02:09:50.398569",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84521.2265625
+    },
+    {
+      "timestamp": "2025-04-19T02:10:32.439906",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84500.7578125
+    },
+    {
+      "timestamp": "2025-04-19T02:10:35.385410",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84500.7578125
+    },
+    {
+      "timestamp": "2025-04-19T02:10:44.194397",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84500.7578125
+    },
+    {
+      "timestamp": "2025-04-19T02:10:45.346597",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84500.7578125
+    },
+    {
+      "timestamp": "2025-04-19T02:11:17.874213",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84486.46875
+    },
+    {
+      "timestamp": "2025-04-19T02:11:49.835278",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84486.46875
+    },
+    {
+      "timestamp": "2025-04-19T02:12:21.456518",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84480.609375
+    },
+    {
+      "timestamp": "2025-04-19T02:12:51.789766",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84480.609375
+    },
+    {
+      "timestamp": "2025-04-19T02:13:21.562702",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84465.890625
+    },
+    {
+      "timestamp": "2025-04-19T02:13:51.746059",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84465.890625
+    },
+    {
+      "timestamp": "2025-04-19T02:14:21.445237",
+      "signal_type": "WEAK_BUY",
+      "confidence": 0.5586,
+      "adjusted_confidence": 0.5586,
+      "regime_type": "transitioning",
+      "validation_metrics": {
+        "original_confidence": 0.57,
+        "adjusted_confidence": 0.5586,
+        "regime_compatibility": 0.0,
+        "historical_accuracy": 0.0,
+        "volume_profile_score": -0.1,
+        "market_context_score": 0.0,
+        "warning_flags": []
+      },
+      "validated": false,
+      "was_accurate": null,
+      "price_at_signal": 84474.390625
+    }
+  ],
+  "metrics": {
+    "total_signals": 0,
+    "accurate_signals": 0,
+    "regime_accuracy": {},
+    "market_type_accuracy": {},
+    "timeframe_accuracy": {}
+  }
+}

@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from signal_validator import SignalValidator
 
 def generate_signals(data):
     """Generate trading signals based on technical indicators"""
@@ -20,10 +21,23 @@ def generate_signals(data):
         "take_profit": None,
         "patterns": [],
         "divergences": [],
-        "bitcoin_price": latest.get('BTC_Price')  # Add BTC price for crypto pairs
+        "bitcoin_price": latest.get('BTC_Price'),  # Add BTC price for crypto pairs
+        "market_regime": None,  # Will store regime detection results
+        "validation": None     # Will store signal validation results
     }
     
-    # Add signals based on indicators
+    # Detect market regime
+    regime_metrics = detect_market_regime(df)
+    signals['market_regime'] = regime_metrics
+    
+    # Add regime information to reasons
+    signals['reasons'].append(f"Market Regime: {regime_metrics['type'].title()} " +
+                            f"(confidence: {regime_metrics['confidence']:.2f})")
+    
+    if regime_metrics['volatility'] == 'high':
+        signals['reasons'].append("High volatility detected - use caution")
+    
+    # Add signals based on indicators with regime context
     signals = check_trend_signals(df, signals)
     signals = check_oscillator_signals(df, signals)
     signals = check_volatility_signals(df, signals)
@@ -39,8 +53,24 @@ def generate_signals(data):
     # Calculate final signal and confidence
     signals = calculate_final_signal(signals)
     
+    # Validate signal
+    validator = SignalValidator()
+    validation = validator.validate_signal(signals, df, regime_metrics)
+    signals['validation'] = validation
+    
+    # Adjust confidence based on validation
+    signals['original_confidence'] = signals['confidence']
+    signals['confidence'] = validation['adjusted_confidence']
+    
+    # Add validation warnings to reasons
+    for warning in validation['warning_flags']:
+        signals['reasons'].append(f"Warning: {warning}")
+    
     # Calculate stop loss and take profit levels
     signals = calculate_risk_reward_levels(df, signals)
+    
+    # Record signal for historical tracking
+    validator.record_signal(signals, validation, regime_metrics)
     
     return signals
 
@@ -588,25 +618,121 @@ def calculate_risk_reward_levels(df, signals):
     latest = df.iloc[-1]
     signal_type = signals['signal']
     atr = latest['ATR']
+    current_price = latest['Close']
     
     # Calculate dynamic multipliers based on market conditions
     stop_multiple, target_multiple = calculate_dynamic_multipliers(df, signals, latest)
     
+    # Initialize levels
+    stop_loss = None
+    take_profit = None
+    
     if signal_type in ["BUY", "STRONG_BUY"]:
         # For buy signals
-        signals['stop_loss'] = round(latest['Close'] - (stop_multiple * atr), 2)
-        signals['take_profit'] = round(latest['Close'] + (target_multiple * atr), 2)
         
+        # Consider support levels for stop loss
+        support_stops = [s for s in signals['support_levels'] if s < current_price]
+        if support_stops:
+            # Use nearest major support as a reference
+            nearest_support = max(support_stops)
+            # Set stop loss below nearest support accounting for volatility
+            technical_stop = nearest_support - (atr * 0.5)
+            # Compare with ATR-based stop
+            atr_stop = current_price - (stop_multiple * atr)
+            # Use the higher of the two to avoid premature stopout
+            stop_loss = max(technical_stop, atr_stop)
+        else:
+            stop_loss = current_price - (stop_multiple * atr)
+        
+        # Consider resistance levels for take profit
+        resistance_targets = [r for r in signals['resistance_levels'] if r > current_price]
+        if resistance_targets:
+            # Use next major resistance as minimum target
+            nearest_resistance = min(resistance_targets)
+            # Set take profit above nearest resistance
+            technical_target = nearest_resistance + (atr * 0.5)
+            # Compare with ATR-based target
+            atr_target = current_price + (target_multiple * atr)
+            # Use the higher target if trend is strong
+            take_profit = max(technical_target, atr_target) if signals['signal'] == "STRONG_BUY" else technical_target
+        else:
+            take_profit = current_price + (target_multiple * atr)
+            
     elif signal_type in ["SELL", "STRONG_SELL"]:
         # For sell signals
-        signals['stop_loss'] = round(latest['Close'] + (stop_multiple * atr), 2)
-        signals['take_profit'] = round(latest['Close'] - (target_multiple * atr), 2)
+        
+        # Consider resistance levels for stop loss
+        resistance_stops = [r for r in signals['resistance_levels'] if r > current_price]
+        if resistance_stops:
+            nearest_resistance = min(resistance_stops)
+            technical_stop = nearest_resistance + (atr * 0.5)
+            atr_stop = current_price + (stop_multiple * atr)
+            stop_loss = min(technical_stop, atr_stop)
+        else:
+            stop_loss = current_price + (stop_multiple * atr)
+        
+        # Consider support levels for take profit
+        support_targets = [s for s in signals['support_levels'] if s < current_price]
+        if support_targets:
+            nearest_support = max(support_targets)
+            technical_target = nearest_support - (atr * 0.5)
+            atr_target = current_price - (target_multiple * atr)
+            take_profit = min(technical_target, atr_target) if signals['signal'] == "STRONG_SELL" else technical_target
+        else:
+            take_profit = current_price - (target_multiple * atr)
+    
+    # Adjust levels based on market regime
+    regime = signals.get('market_regime', {})
+    if regime.get('type') == 'volatile':
+        # Wider stops in volatile markets
+        stop_adjustment = 1.3
+        target_adjustment = 1.4
+    elif regime.get('type') == 'ranging':
+        # Use support/resistance levels more strictly in ranging markets
+        stop_adjustment = 0.9
+        target_adjustment = 0.85
+    else:  # trending or unknown
+        stop_adjustment = 1.0
+        target_adjustment = 1.0
+    
+    # Apply regime adjustments
+    if stop_loss is not None:
+        if signal_type in ["BUY", "STRONG_BUY"]:
+            stop_loss -= (current_price - stop_loss) * (stop_adjustment - 1)
+        else:
+            stop_loss += (stop_loss - current_price) * (stop_adjustment - 1)
+    
+    if take_profit is not None:
+        if signal_type in ["BUY", "STRONG_BUY"]:
+            take_profit += (take_profit - current_price) * (target_adjustment - 1)
+        else:
+            take_profit -= (current_price - take_profit) * (target_adjustment - 1)
+    
+    # Validate risk-reward ratio
+    if stop_loss is not None and take_profit is not None:
+        risk = abs(current_price - stop_loss)
+        reward = abs(take_profit - current_price)
+        rr_ratio = reward / risk if risk > 0 else 0
+        
+        # Adjust if RR ratio is too low
+        min_rr_ratio = 1.5
+        if rr_ratio < min_rr_ratio:
+            if signal_type in ["BUY", "STRONG_BUY"]:
+                take_profit = current_price + (risk * min_rr_ratio)
+            else:
+                take_profit = current_price - (risk * min_rr_ratio)
+    
+    # Round values to appropriate precision
+    if stop_loss is not None:
+        signals['stop_loss'] = round(stop_loss, 2)
+    if take_profit is not None:
+        signals['take_profit'] = round(take_profit, 2)
     
     return signals
 
 def calculate_dynamic_multipliers(df, signals, latest):
     """Calculate dynamic stop loss and take profit multipliers based on market conditions"""
-    # Base multipliers
+    # Base multipliers - adjusted based on market regime
     base_stop = 1.5
     base_target = 2.0
     
@@ -614,78 +740,89 @@ def calculate_dynamic_multipliers(df, signals, latest):
     adx = latest['ADX']
     if adx > 30:  # Strong trend
         base_target *= 1.5
+        base_stop *= 0.9  # Tighter stop in strong trend
     elif adx < 20:  # Weak trend
-        base_stop *= 0.8
-        base_target *= 0.8
+        base_stop *= 1.2  # Wider stop in weak trend
+        base_target *= 0.9
     
-    # Adjust based on volatility
+    # Adjust based on volatility using Bollinger Bands and ATR
     bb_width = (latest['BB_upper'] - latest['BB_lower']) / latest['BB_middle']
     avg_bb_width = ((df['BB_upper'] - df['BB_lower']) / df['BB_middle']).mean()
+    atr = latest['ATR']
+    atr_ma = df['ATR'].rolling(window=20).mean().iloc[-1]
     
-    if bb_width > avg_bb_width * 1.5:  # High volatility
-        base_stop *= 1.2
-        base_target *= 1.3
-    elif bb_width < avg_bb_width * 0.5:  # Low volatility
-        base_stop *= 0.8
-        base_target *= 0.8
+    # Volatility adjustment
+    volatility_factor = (bb_width / avg_bb_width + atr / atr_ma) / 2
+    if volatility_factor > 1.5:  # High volatility
+        base_stop *= 1.3  # Wider stop loss
+        base_target *= 1.4  # Higher target for higher risk
+    elif volatility_factor < 0.7:  # Low volatility
+        base_stop *= 0.8  # Tighter stop
+        base_target *= 0.8  # Lower target
     
-    # Adjust based on RSI extremes
+    # RSI-based adjustments
     rsi = latest['RSI14']
-    if rsi > 70 or rsi < 30:
-        base_target *= 0.8  # More conservative targets in overbought/oversold conditions
+    if rsi > 70:  # Overbought
+        if signals['signal'].startswith('SELL'):
+            base_target *= 1.2  # Better potential for downside
+        else:
+            base_stop *= 0.8  # Tighter stop for risky long
+    elif rsi < 30:  # Oversold
+        if signals['signal'].startswith('BUY'):
+            base_target *= 1.2  # Better potential for upside
+        else:
+            base_stop *= 0.8  # Tighter stop for risky short
     
-    # Adjust based on support/resistance proximity
-    if signals['support_levels'] and signals['resistance_levels']:
-        current_price = latest['Close']
-        nearest_support = min([s for s in signals['support_levels'] if s < current_price], default=None)
-        nearest_resistance = min([r for r in signals['resistance_levels'] if r > current_price], default=None)
+    # Adjust based on key levels proximity
+    support_levels = signals['support_levels']
+    resistance_levels = signals['resistance_levels']
+    current_price = latest['Close']
+    
+    if support_levels and resistance_levels:
+        nearest_support = max([s for s in support_levels if s < current_price], default=None)
+        nearest_resistance = min([r for r in resistance_levels if r > current_price], default=None)
         
         if nearest_support and nearest_resistance:
             price_range = nearest_resistance - nearest_support
             if price_range > 0:
                 position_in_range = (current_price - nearest_support) / price_range
-                if position_in_range < 0.2:  # Close to support
-                    base_target *= 1.2
-                elif position_in_range > 0.8:  # Close to resistance
-                    base_stop *= 0.8
+                # Adjust targets based on position within S/R range
+                if position_in_range < 0.2:  # Near support
+                    if signals['signal'].startswith('BUY'):
+                        base_stop *= 0.8  # Tighter stop near support for longs
+                        base_target *= 1.2  # Higher target potential
+                elif position_in_range > 0.8:  # Near resistance
+                    if signals['signal'].startswith('SELL'):
+                        base_stop *= 0.8  # Tighter stop near resistance for shorts
+                        base_target *= 1.2  # Higher target potential
     
-    # Adjust based on market patterns
-    if signals['patterns']:
-        pattern_adjustments = {
-            'Hammer pattern (bullish)': {'target': 1.2, 'stop': 0.9},
-            'Inverted Hammer pattern (bearish)': {'target': 1.2, 'stop': 0.9},
-            'Morning Star pattern (bullish)': {'target': 1.3, 'stop': 0.8},
-            'Evening Star pattern (bearish)': {'target': 1.3, 'stop': 0.8},
-            'Doji pattern (indecision)': {'target': 0.8, 'stop': 1.2}
-        }
-        
-        for pattern in signals['patterns']:
-            if pattern in pattern_adjustments:
-                base_target *= pattern_adjustments[pattern]['target']
-                base_stop *= pattern_adjustments[pattern]['stop']
+    # Consider volume profile
+    if 'volume_metrics' in signals:
+        vm = signals['volume_metrics']
+        if vm.get('obv_trend') and vm.get('cmf_trend'):  # Strong volume confirmation
+            base_target *= 1.2  # Higher target with volume confirmation
     
-    # Adjust based on divergences
-    if signals['divergences']:
-        for divergence in signals['divergences']:
-            if 'Bullish' in divergence:
-                base_target *= 1.2
-            elif 'Bearish' in divergence:
-                base_target *= 0.8
+    # Consider market regime
+    regime = signals.get('market_regime', {})
+    if regime.get('type') == 'trending' and regime.get('confidence', 0) > 0.7:
+        base_target *= 1.2  # Higher targets in strong trends
+    elif regime.get('type') == 'ranging':
+        base_target *= 0.8  # Lower targets in ranging markets
+        base_stop *= 1.2  # Wider stops in ranging markets
     
-    # Adjust based on volume metrics
-    volume_metrics = signals.get('volume_metrics', {})
-    if volume_metrics.get('obv_trend'):
-        base_target *= 1.1
-    if volume_metrics.get('cmf_trend'):
-        base_target *= 1.1
-    
-    # Final adjustments based on signal strength
-    if signals['signal'] in ['STRONG_BUY', 'STRONG_SELL']:
-        base_target *= 1.2
+    # Add Fibonacci extension levels for trend-following trades
+    if signals['signal'].startswith(('STRONG_BUY', 'STRONG_SELL')):
+        high = df['High'].tail(20).max()
+        low = df['Low'].tail(20).min()
+        fib_range = high - low
+        if signals['signal'].startswith('STRONG_BUY'):
+            base_target = max(base_target, (high + 0.618 * fib_range - current_price) / atr)
+        else:
+            base_target = max(base_target, (current_price - (low - 0.618 * fib_range)) / atr)
     
     # Ensure minimum and maximum values
     base_stop = max(1.0, min(3.0, base_stop))
-    base_target = max(1.5, min(4.0, base_target))
+    base_target = max(1.5, min(5.0, base_target))
     
     return base_stop, base_target
 
@@ -748,3 +885,77 @@ def check_crypto_patterns(df, signals):
         print(f"Error in crypto pattern analysis: {str(e)}")
     
     return signals
+
+def detect_market_regime(df):
+    """
+    Detect current market regime (trending, ranging, volatile)
+    Returns regime type and confidence score
+    """
+    # Initialize metrics
+    regime_metrics = {
+        'type': 'unknown',
+        'confidence': 0.0,
+        'volatility': 'normal',
+        'trend_strength': 0.0,
+        'range_strength': 0.0
+    }
+    
+    latest = df.iloc[-1]
+    lookback = min(100, len(df))
+    recent = df.iloc[-lookback:]
+    
+    # Trend Analysis
+    adx = latest['ADX']
+    trend_signals = 0
+    
+    # Check moving averages alignment
+    trend_signals += 1 if latest['EMA9'] > latest['EMA21'] else -1
+    trend_signals += 1 if latest['EMA21'] > latest['SMA50'] else -1
+    trend_signals += 1 if latest['SMA50'] > latest['SMA200'] else -1
+    
+    # Normalize trend signals
+    trend_strength = abs(trend_signals) / 3
+    
+    # Volatility Analysis
+    atr = latest['ATR']
+    atr_ma = recent['ATR'].mean()
+    bb_width = (latest['BB_upper'] - latest['BB_lower']) / latest['BB_middle']
+    avg_bb_width = ((recent['BB_upper'] - recent['BB_lower']) / recent['BB_middle']).mean()
+    
+    # Range Analysis
+    highs = recent['High']
+    lows = recent['Low']
+    range_size = (highs.max() - lows.min()) / lows.min()
+    price_location = (latest['Close'] - lows.min()) / (highs.max() - lows.min())
+    
+    # Determine volatility state
+    if bb_width > avg_bb_width * 1.5 or atr > atr_ma * 1.5:
+        volatility = 'high'
+    elif bb_width < avg_bb_width * 0.5 or atr < atr_ma * 0.5:
+        volatility = 'low'
+    else:
+        volatility = 'normal'
+    
+    # Determine market regime
+    if adx > 25 and trend_strength > 0.6:
+        regime_type = 'trending'
+        confidence = min(1.0, (adx / 50 + trend_strength) / 2)
+    elif volatility == 'low' and 0.2 < price_location < 0.8:
+        regime_type = 'ranging'
+        confidence = 1.0 - (bb_width / avg_bb_width)
+    elif volatility == 'high':
+        regime_type = 'volatile'
+        confidence = min(1.0, bb_width / avg_bb_width)
+    else:
+        regime_type = 'transitioning'
+        confidence = 0.5
+    
+    regime_metrics.update({
+        'type': regime_type,
+        'confidence': round(confidence, 2),
+        'volatility': volatility,
+        'trend_strength': round(trend_strength, 2),
+        'range_strength': round(1 - range_size, 2)
+    })
+    
+    return regime_metrics
