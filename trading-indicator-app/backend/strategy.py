@@ -19,7 +19,8 @@ def generate_signals(data):
         "stop_loss": None,
         "take_profit": None,
         "patterns": [],
-        "divergences": []
+        "divergences": [],
+        "bitcoin_price": latest.get('BTC_Price')  # Add BTC price for crypto pairs
     }
     
     # Add signals based on indicators
@@ -30,6 +31,10 @@ def generate_signals(data):
     signals = check_pattern_signals(df, signals)
     signals = check_divergence_signals(df, signals)
     signals = check_support_resistance(df, signals)
+    
+    # Check for crypto-specific patterns if BTC price is available
+    if 'BTC_Price' in df.columns:
+        signals = check_crypto_patterns(df, signals)
     
     # Calculate final signal and confidence
     signals = calculate_final_signal(signals)
@@ -368,49 +373,378 @@ def check_support_resistance(df, signals):
 
 def calculate_final_signal(signals):
     """Determine final signal type and normalize confidence"""
-    confidence = signals['confidence']
+    # Get all indicators' states
+    trend_score = calculate_trend_score(signals)
+    momentum_score = calculate_momentum_score(signals)
+    volume_score = calculate_volume_score(signals)
+    volatility_score = calculate_volatility_score(signals)
+    pattern_score = calculate_pattern_score(signals)
+    support_resistance_score = calculate_sr_score(signals)
     
-    # Normalize confidence to 0-1 range
-    confidence = min(max(confidence, -1.0), 1.0)
-    confidence_normalized = (confidence + 1) / 2  # Convert from [-1,1] to [0,1]
+    # Calculate weighted final score
+    final_score = (
+        trend_score * 0.35 +        # Trend has highest weight
+        momentum_score * 0.20 +     # Momentum second
+        volume_score * 0.15 +       # Volume confirmation
+        volatility_score * 0.10 +   # Volatility context
+        pattern_score * 0.10 +      # Pattern recognition
+        support_resistance_score * 0.10  # S/R levels
+    )
     
-    # Determine signal type based on confidence
-    if confidence > 0.5:
-        signals['signal'] = "STRONG_BUY"
-    elif confidence > 0.1:
-        signals['signal'] = "BUY"
-    elif confidence < -0.5:
-        signals['signal'] = "STRONG_SELL"
-    elif confidence < -0.1:
-        signals['signal'] = "SELL"
+    # Normalize final score to -1 to 1 range
+    final_score = max(min(final_score, 1.0), -1.0)
+    
+    # Convert to confidence (0-1 range)
+    confidence = (final_score + 1) / 2
+    
+    # Determine signal type with more granular categories
+    if final_score > 0.7:
+        signal = "STRONG_BUY"
+    elif final_score > 0.3:
+        signal = "BUY"
+    elif final_score > 0.1:
+        signal = "WEAK_BUY"
+    elif final_score > -0.1:
+        signal = "NEUTRAL"
+    elif final_score > -0.3:
+        signal = "WEAK_SELL"
+    elif final_score > -0.7:
+        signal = "SELL"
     else:
-        signals['signal'] = "NEUTRAL"
+        signal = "STRONG_SELL"
     
-    # Update confidence
-    signals['confidence'] = round(confidence_normalized, 2)
+    # Update signals dictionary
+    signals['signal'] = signal
+    signals['confidence'] = round(confidence, 2)
+    signals['signal_metrics'] = {
+        'trend_score': round(trend_score, 2),
+        'momentum_score': round(momentum_score, 2),
+        'volume_score': round(volume_score, 2),
+        'volatility_score': round(volatility_score, 2),
+        'pattern_score': round(pattern_score, 2),
+        'support_resistance_score': round(support_resistance_score, 2)
+    }
     
     return signals
 
+def calculate_trend_score(signals):
+    """Calculate trend score from -1 to 1"""
+    score = 0
+    count = 0
+    
+    # Moving averages alignment
+    if 'EMA9' in signals and 'EMA21' in signals:
+        score += 1 if signals['EMA9'] > signals['EMA21'] else -1
+        count += 1
+    
+    if 'Close' in signals and 'SMA200' in signals:
+        score += 1 if signals['Close'] > signals['SMA200'] else -1
+        count += 1
+    
+    # MACD direction
+    if 'MACD' in signals and 'MACD_signal' in signals:
+        score += 1 if signals['MACD'] > signals['MACD_signal'] else -1
+        count += 1
+    
+    # ADX strength modifier
+    adx = signals.get('ADX', 0)
+    if adx > 25:  # Strong trend
+        score *= 1.2
+    elif adx < 20:  # Weak trend
+        score *= 0.8
+    
+    return score / max(count, 1)  # Normalize to -1 to 1
+
+def calculate_momentum_score(signals):
+    """Calculate momentum score from -1 to 1"""
+    score = 0
+    count = 0
+    
+    # RSI signals
+    rsi14 = signals.get('RSI14', 50)
+    if rsi14 < 30:
+        score += 1  # Oversold (bullish)
+    elif rsi14 > 70:
+        score -= 1  # Overbought (bearish)
+    count += 1
+    
+    # Stochastic signals
+    if 'STOCH_K' in signals and 'STOCH_D' in signals:
+        k, d = signals['STOCH_K'], signals['STOCH_D']
+        if k < 20 and d < 20:
+            score += 1  # Oversold
+        elif k > 80 and d > 80:
+            score -= 1  # Overbought
+        count += 1
+    
+    # Williams %R
+    willr = signals.get('WILLR', -50)
+    if willr < -80:
+        score += 1  # Oversold
+    elif willr > -20:
+        score -= 1  # Overbought
+    count += 1
+    
+    return score / max(count, 1)
+
+def calculate_volume_score(signals):
+    """Calculate volume score from -1 to 1"""
+    score = 0
+    count = 0
+    
+    # Volume trend
+    if 'volume_metrics' in signals:
+        metrics = signals['volume_metrics']
+        if metrics.get('obv_trend'):
+            score += 1
+            count += 1
+        if metrics.get('cmf_trend'):
+            score += 1
+            count += 1
+        
+        # Volume momentum
+        if metrics.get('volume_momentum', 0) > 0.5:
+            score += 1
+            count += 1
+    
+    return score / max(count, 1)
+
+def calculate_volatility_score(signals):
+    """Calculate volatility score from -1 to 1"""
+    score = 0
+    count = 0
+    
+    # Bollinger Bands
+    if all(k in signals for k in ['Close', 'BB_upper', 'BB_lower']):
+        if signals['Close'] < signals['BB_lower']:
+            score += 1  # Potential reversal up
+        elif signals['Close'] > signals['BB_upper']:
+            score -= 1  # Potential reversal down
+        count += 1
+    
+    # ATR trending
+    if 'ATR' in signals:
+        atr_ma = signals.get('ATR_MA', signals['ATR'])
+        if signals['ATR'] < atr_ma:
+            score += 0.5  # Lower volatility (more predictable)
+        count += 1
+    
+    return score / max(count, 1)
+
+def calculate_pattern_score(signals):
+    """Calculate pattern score from -1 to 1"""
+    score = 0
+    count = 0
+    
+    if 'patterns' in signals:
+        for pattern in signals['patterns']:
+            if 'bullish' in pattern.lower():
+                score += 1
+            elif 'bearish' in pattern.lower():
+                score -= 1
+            count += 1
+    
+    if 'divergences' in signals:
+        for divergence in signals['divergences']:
+            if 'bullish' in divergence.lower():
+                score += 1
+            elif 'bearish' in divergence.lower():
+                score -= 1
+            count += 1
+    
+    return score / max(count, 1)
+
+def calculate_sr_score(signals):
+    """Calculate support/resistance score from -1 to 1"""
+    score = 0
+    
+    if 'Close' in signals and signals['support_levels'] and signals['resistance_levels']:
+        current_price = signals['Close']
+        
+        # Find nearest support and resistance
+        supports = [s for s in signals['support_levels'] if s < current_price]
+        resistances = [r for r in signals['resistance_levels'] if r > current_price]
+        
+        if supports and resistances:
+            nearest_support = max(supports)
+            nearest_resistance = min(resistances)
+            
+            # Calculate price position between S/R levels
+            range_size = nearest_resistance - nearest_support
+            if range_size > 0:
+                position = (current_price - nearest_support) / range_size
+                
+                if position < 0.2:  # Close to support (bullish)
+                    score = 1
+                elif position > 0.8:  # Close to resistance (bearish)
+                    score = -1
+                else:  # In the middle of range
+                    score = 0.5 - position
+    
+    return score
+
 def calculate_risk_reward_levels(df, signals):
-    """Calculate stop loss and take profit levels based on signals and ATR"""
+    """Calculate dynamic stop loss and take profit levels based on technical analysis"""
     latest = df.iloc[-1]
     signal_type = signals['signal']
     atr = latest['ATR']
     
+    # Calculate dynamic multipliers based on market conditions
+    stop_multiple, target_multiple = calculate_dynamic_multipliers(df, signals, latest)
+    
     if signal_type in ["BUY", "STRONG_BUY"]:
         # For buy signals
-        stop_multiple = 1.5
-        target_multiple = 2.0 if signal_type == "BUY" else 3.0
-        
         signals['stop_loss'] = round(latest['Close'] - (stop_multiple * atr), 2)
         signals['take_profit'] = round(latest['Close'] + (target_multiple * atr), 2)
         
     elif signal_type in ["SELL", "STRONG_SELL"]:
         # For sell signals
-        stop_multiple = 1.5
-        target_multiple = 2.0 if signal_type == "SELL" else 3.0
-        
         signals['stop_loss'] = round(latest['Close'] + (stop_multiple * atr), 2)
         signals['take_profit'] = round(latest['Close'] - (target_multiple * atr), 2)
+    
+    return signals
+
+def calculate_dynamic_multipliers(df, signals, latest):
+    """Calculate dynamic stop loss and take profit multipliers based on market conditions"""
+    # Base multipliers
+    base_stop = 1.5
+    base_target = 2.0
+    
+    # Adjust based on trend strength (ADX)
+    adx = latest['ADX']
+    if adx > 30:  # Strong trend
+        base_target *= 1.5
+    elif adx < 20:  # Weak trend
+        base_stop *= 0.8
+        base_target *= 0.8
+    
+    # Adjust based on volatility
+    bb_width = (latest['BB_upper'] - latest['BB_lower']) / latest['BB_middle']
+    avg_bb_width = ((df['BB_upper'] - df['BB_lower']) / df['BB_middle']).mean()
+    
+    if bb_width > avg_bb_width * 1.5:  # High volatility
+        base_stop *= 1.2
+        base_target *= 1.3
+    elif bb_width < avg_bb_width * 0.5:  # Low volatility
+        base_stop *= 0.8
+        base_target *= 0.8
+    
+    # Adjust based on RSI extremes
+    rsi = latest['RSI14']
+    if rsi > 70 or rsi < 30:
+        base_target *= 0.8  # More conservative targets in overbought/oversold conditions
+    
+    # Adjust based on support/resistance proximity
+    if signals['support_levels'] and signals['resistance_levels']:
+        current_price = latest['Close']
+        nearest_support = min([s for s in signals['support_levels'] if s < current_price], default=None)
+        nearest_resistance = min([r for r in signals['resistance_levels'] if r > current_price], default=None)
+        
+        if nearest_support and nearest_resistance:
+            price_range = nearest_resistance - nearest_support
+            if price_range > 0:
+                position_in_range = (current_price - nearest_support) / price_range
+                if position_in_range < 0.2:  # Close to support
+                    base_target *= 1.2
+                elif position_in_range > 0.8:  # Close to resistance
+                    base_stop *= 0.8
+    
+    # Adjust based on market patterns
+    if signals['patterns']:
+        pattern_adjustments = {
+            'Hammer pattern (bullish)': {'target': 1.2, 'stop': 0.9},
+            'Inverted Hammer pattern (bearish)': {'target': 1.2, 'stop': 0.9},
+            'Morning Star pattern (bullish)': {'target': 1.3, 'stop': 0.8},
+            'Evening Star pattern (bearish)': {'target': 1.3, 'stop': 0.8},
+            'Doji pattern (indecision)': {'target': 0.8, 'stop': 1.2}
+        }
+        
+        for pattern in signals['patterns']:
+            if pattern in pattern_adjustments:
+                base_target *= pattern_adjustments[pattern]['target']
+                base_stop *= pattern_adjustments[pattern]['stop']
+    
+    # Adjust based on divergences
+    if signals['divergences']:
+        for divergence in signals['divergences']:
+            if 'Bullish' in divergence:
+                base_target *= 1.2
+            elif 'Bearish' in divergence:
+                base_target *= 0.8
+    
+    # Adjust based on volume metrics
+    volume_metrics = signals.get('volume_metrics', {})
+    if volume_metrics.get('obv_trend'):
+        base_target *= 1.1
+    if volume_metrics.get('cmf_trend'):
+        base_target *= 1.1
+    
+    # Final adjustments based on signal strength
+    if signals['signal'] in ['STRONG_BUY', 'STRONG_SELL']:
+        base_target *= 1.2
+    
+    # Ensure minimum and maximum values
+    base_stop = max(1.0, min(3.0, base_stop))
+    base_target = max(1.5, min(4.0, base_target))
+    
+    return base_stop, base_target
+
+# Add new crypto-specific function
+def check_crypto_patterns(df, signals):
+    """Check for cryptocurrency-specific patterns and metrics"""
+    latest = df.iloc[-1]
+    
+    try:
+        # Calculate BTC correlation if BTC price is available
+        if 'BTC_Price' in df.columns:
+            # Get price changes
+            df['returns'] = df['Close'].pct_change()
+            df['btc_returns'] = df['BTC_Price'].pct_change()
+            
+            # Calculate rolling correlation with BTC
+            correlation = df['returns'].corr(df['btc_returns'])
+            
+            if abs(correlation) > 0.7:
+                signals['reasons'].append(f"Strong correlation with BTC: {correlation:.2f}")
+                # Adjust confidence based on BTC trend
+                if df['btc_returns'].tail(5).mean() > 0:
+                    signals['confidence'] += 0.1
+                else:
+                    signals['confidence'] -= 0.1
+        
+        # Check for extreme volume spikes (common in crypto)
+        volume_ma = df['Volume'].rolling(window=20).mean()
+        current_volume = latest['Volume']
+        
+        if current_volume > volume_ma.iloc[-1] * 3:
+            signals['reasons'].append("Extreme volume spike detected (3x average)")
+            signals['confidence'] *= 1.2
+        
+        # Check for weekend effect (crypto trades 24/7)
+        if pd.to_datetime(latest['Date']).weekday() in [5, 6]:  # Weekend
+            signals['reasons'].append("Weekend trading period - typically lower volume")
+            signals['confidence'] *= 0.9
+        
+        # Check for potential flash crash recovery
+        recent_low = df['Low'].tail(5).min()
+        if latest['Close'] > recent_low * 1.1 and latest['Low'] < recent_low * 1.05:
+            signals['reasons'].append("Potential flash crash recovery pattern")
+            signals['confidence'] += 0.15
+        
+        # Check for high volatility periods
+        atr = df['ATR'].iloc[-1]
+        atr_ma = df['ATR'].rolling(window=20).mean().iloc[-1]
+        
+        if atr > atr_ma * 1.5:
+            signals['reasons'].append("High volatility period - use caution")
+            signals['confidence'] *= 0.8
+        
+        # Check for whale activity (large transactions)
+        if current_volume * latest['Close'] > volume_ma.iloc[-1] * latest['Close'] * 5:
+            signals['reasons'].append("Potential whale activity detected")
+            signals['confidence'] *= 1.1
+        
+    except Exception as e:
+        print(f"Error in crypto pattern analysis: {str(e)}")
     
     return signals

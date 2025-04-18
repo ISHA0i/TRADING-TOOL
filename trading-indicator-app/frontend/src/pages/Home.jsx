@@ -22,6 +22,12 @@ const MAJOR_INDICES = [
   { symbol: "^FCHI", name: "CAC 40" }
 ];
 
+const CRYPTO_PAIRS = [
+  "BTC-USD", "ETH-USD", "BNB-USD", "XRP-USD",
+  "ADA-USD", "DOGE-USD", "SOL-USD", "DOT-USD",
+  "MATIC-USD", "LINK-USD"
+];
+
 function Home() {
   const [symbolType, setSymbolType] = useState('stock');
   const [ticker, setTicker] = useState('');
@@ -113,6 +119,10 @@ function Home() {
         return MAJOR_INDICES.map(index => (
           <option key={index.symbol} value={index.symbol}>{index.name} ({index.symbol})</option>
         ));
+      case 'crypto':
+        return CRYPTO_PAIRS.map(pair => (
+          <option key={pair} value={pair}>{pair}</option>
+        ));
       default:
         return []; // For stocks, we'll use the custom input
     }
@@ -149,6 +159,7 @@ function Home() {
                 >
                   <option value="stock">Stocks</option>
                   <option value="forex">Forex</option>
+                  <option value="crypto">Crypto</option>
                   <option value="index">Indices</option>
                 </select>
               </div>
@@ -156,7 +167,7 @@ function Home() {
               {/* Symbol Selection */}
               <div>
                 <label className="block text-sm font-medium text-dark-text-secondary mb-1">
-                  {symbolType === 'stock' ? 'Stock Symbol' : symbolType === 'forex' ? 'Currency Pair' : 'Index'}
+                  {symbolType === 'stock' ? 'Stock Symbol' : symbolType === 'forex' ? 'Currency Pair' : symbolType === 'crypto' ? 'Cryptocurrency' : 'Index'}
                 </label>
                 {symbolType === 'stock' ? (
                   <input
@@ -174,7 +185,7 @@ function Home() {
                     onChange={handleSymbolSelect}
                     required
                   >
-                    <option value="">Select {symbolType === 'forex' ? 'a pair' : 'an index'}</option>
+                    <option value="">Select {symbolType === 'forex' ? 'a pair' : symbolType === 'crypto' ? 'a cryptocurrency' : 'an index'}</option>
                     {getSymbolOptions()}
                   </select>
                 )}

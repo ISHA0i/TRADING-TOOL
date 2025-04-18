@@ -48,11 +48,14 @@ const RiskRewardCard = ({ data, symbolType }) => {
   
   const metrics = calculateMetrics();
   
-  // Format price with appropriate decimals based on market type
+  // Update formatPrice function to handle crypto
   const formatPrice = (price) => {
     if (!price) return 'N/A';
     
-    if (symbolType === 'forex') {
+    if (symbolType === 'crypto') {
+      // Format crypto prices with more decimals for low-value coins
+      return price < 1 ? price.toFixed(6) : price.toFixed(2);
+    } else if (symbolType === 'forex') {
       const isJPYPair = ticker.includes('JPY');
       return isJPYPair ? price.toFixed(3) : price.toFixed(5);
     }

@@ -34,6 +34,19 @@ def calculate_position(signals, capital, current_price):
     # Skip if neutral signal or missing stop loss
     if signal_type == "NEUTRAL" or stop_loss is None:
         return capital_plan
+
+    # Check if this is a crypto asset by looking for BTC price
+    is_crypto = "bitcoin_price" in signals
+    
+    # For crypto assets, adjust risk based on market conditions
+    if is_crypto:
+        # Reduce position size for highly volatile crypto assets
+        if signals.get("volatility_adjusted_size", 0) > 2.0:
+            capital_plan["max_position_size_percent"] = 5.0  # Reduce max position size
+        
+        # Check BTC correlation for risk adjustment
+        if any("correlation with BTC" in reason for reason in signals.get("reasons", [])):
+            capital_plan["risk_percent"] = 0.75  # Reduce risk for highly correlated assets
     
     # Calculate market conditions with safe division
     bb_upper = signals.get('BB_upper', current_price)
@@ -60,7 +73,7 @@ def calculate_position(signals, capital, current_price):
     volatility = signals.get('ATR', 0)
     trend_strength = signals.get('ADX', 0)
     position_size_percent = calculate_dynamic_position_size(
-        capital, volatility, trend_strength, signal_strength, market_conditions
+        capital, volatility, trend_strength, signal_strength, market_conditions, is_crypto
     )
     
     # Calculate Kelly Criterion
@@ -74,7 +87,7 @@ def calculate_position(signals, capital, current_price):
     position_size_percent *= kelly
     
     # Calculate dollar risk amount
-    risk_amount = capital * position_size_percent
+    risk_amount = capital * (capital_plan["risk_percent"] / 100)
     
     # Calculate price risk
     if signal_type in ["BUY", "STRONG_BUY"]:
@@ -91,7 +104,7 @@ def calculate_position(signals, capital, current_price):
         position_size_units = position_size_usd / current_price
     
     # Apply maximum position constraint
-    max_position_usd = capital * 0.1
+    max_position_usd = capital * (capital_plan["max_position_size_percent"] / 100)
     if position_size_usd > max_position_usd:
         position_size_usd = max_position_usd
         position_size_units = position_size_usd / current_price
@@ -115,7 +128,7 @@ def calculate_position(signals, capital, current_price):
     # Update capital plan
     capital_plan.update({
         "position_size_usd": round(position_size_usd, 2),
-        "position_size_units": round(position_size_units, 4),
+        "position_size_units": round(position_size_units, 8 if is_crypto else 4),  # More decimals for crypto
         "stop_loss_usd": round(potential_loss, 2),
         "potential_profit_usd": round(potential_profit, 2),
         "risk_reward_ratio": round(risk_reward_ratio, 2),
@@ -157,7 +170,7 @@ def calculate_trailing_stop(current_price, entry_price, atr, signal_type):
     
     return round(trailing_stop, 2)
 
-def calculate_dynamic_position_size(capital, volatility, trend_strength, signal_confidence, market_conditions):
+def calculate_dynamic_position_size(capital, volatility, trend_strength, signal_confidence, market_conditions, is_crypto=False):
     """
     Calculate dynamic position size based on market conditions
     
@@ -167,40 +180,63 @@ def calculate_dynamic_position_size(capital, volatility, trend_strength, signal_
         trend_strength: Strength of the trend (ADX)
         signal_confidence: Confidence in the signal
         market_conditions: Dictionary containing market condition metrics
+        is_crypto: Boolean indicating if the asset is a cryptocurrency
         
     Returns:
         Dynamic position size as percentage of capital
     """
-    # Base position size
-    base_size = 0.02  # 2% of capital
+    # Base position size - lower for crypto
+    base_size = 0.01 if is_crypto else 0.02  # 1% for crypto, 2% for others
     
     # Market condition factors
-    volatility_factor = calculate_volatility_factor(volatility, capital)
+    volatility_factor = calculate_volatility_factor(volatility, capital, is_crypto)
     trend_factor = calculate_trend_factor(trend_strength)
     confidence_factor = calculate_confidence_factor(signal_confidence)
     market_phase_factor = calculate_market_phase_factor(market_conditions)
     volume_factor = calculate_volume_factor(market_conditions)
     
+    # For crypto, add extra risk adjustments
+    if is_crypto:
+        # Reduce position size during high volatility periods
+        if volatility_factor < 0.7:
+            base_size *= 0.75
+        
+        # Reduce position size during weekends (typically lower volume)
+        from datetime import datetime
+        if datetime.now().weekday() in [5, 6]:  # Weekend
+            base_size *= 0.8
+    
     # Calculate final position size
     position_size = base_size * volatility_factor * trend_factor * confidence_factor * market_phase_factor * volume_factor
     
-    # Apply maximum position constraint
-    return min(0.1, position_size)
+    # Apply maximum position constraint (stricter for crypto)
+    max_size = 0.05 if is_crypto else 0.1  # 5% for crypto, 10% for others
+    return min(max_size, position_size)
 
-def calculate_volatility_factor(volatility, capital):
+def calculate_volatility_factor(volatility, capital, is_crypto=False):
     """Calculate position size adjustment based on volatility"""
     # Normalize volatility relative to capital
     normalized_volatility = volatility / capital
     
-    # Higher volatility = smaller position size
-    if normalized_volatility > 0.05:  # Very high volatility
-        return 0.5
-    elif normalized_volatility > 0.02:  # High volatility
-        return 0.7
-    elif normalized_volatility > 0.01:  # Medium volatility
-        return 0.9
-    else:  # Low volatility
-        return 1.0
+    # Stricter thresholds for crypto
+    if is_crypto:
+        if normalized_volatility > 0.1:  # Very high volatility
+            return 0.3
+        elif normalized_volatility > 0.05:  # High volatility
+            return 0.5
+        elif normalized_volatility > 0.02:  # Medium volatility
+            return 0.7
+        else:  # Low volatility
+            return 1.0
+    else:
+        if normalized_volatility > 0.05:  # Very high volatility
+            return 0.5
+        elif normalized_volatility > 0.02:  # High volatility
+            return 0.7
+        elif normalized_volatility > 0.01:  # Medium volatility
+            return 0.9
+        else:  # Low volatility
+            return 1.0
 
 def calculate_trend_factor(trend_strength):
     """Calculate position size adjustment based on trend strength"""

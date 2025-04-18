@@ -34,6 +34,8 @@ const CapitalUsageCard = ({ data, symbolType }) => {
   const formatUnits = (units) => {
     if (symbolType === 'forex') {
       return units.toFixed(2) + ' lots';
+    } else if (symbolType === 'crypto') {
+      return units.toFixed(8) + ' coins'; // Use 8 decimals for crypto
     }
     return units.toFixed(4) + ' units';
   };
@@ -53,6 +55,14 @@ const CapitalUsageCard = ({ data, symbolType }) => {
       return {
         lotSize: lotValue.toFixed(2),
         pipValue: formatMoney(pipMoneyValue)
+      };
+    } else if (symbolType === 'crypto') {
+      // Add crypto-specific metrics
+      const btcValue = ticker.startsWith('BTC-') ? position_size_units : 
+                      (position_size_usd / (signals.bitcoin_price || 0));
+      return {
+        btcValue: btcValue.toFixed(8),
+        dollarsPerCoin: (position_size_usd / position_size_units).toFixed(2)
       };
     }
     return null;
@@ -83,10 +93,24 @@ const CapitalUsageCard = ({ data, symbolType }) => {
             
             {marketMetrics && (
               <div className="flex justify-between">
-                <span className="text-dark-text-secondary">Lot Size</span>
+                <span className="text-dark-text-secondary">
+                  {symbolType === 'forex' ? 'Lot Size' : symbolType === 'crypto' ? 'BTC Value' : ''}
+                </span>
                 <div className="text-right">
-                  <div className="font-semibold text-dark-text">{marketMetrics.lotSize} lots</div>
-                  <div className="text-sm text-dark-text-secondary">Per pip: {marketMetrics.pipValue}</div>
+                  <div className="font-semibold text-dark-text">
+                    {symbolType === 'forex' ? (
+                      `${marketMetrics.lotSize} lots`
+                    ) : symbolType === 'crypto' ? (
+                      `${marketMetrics.btcValue} BTC`
+                    ) : null}
+                  </div>
+                  <div className="text-sm text-dark-text-secondary">
+                    {symbolType === 'forex' ? (
+                      `Per pip: ${marketMetrics.pipValue}`
+                    ) : symbolType === 'crypto' ? (
+                      `$${marketMetrics.dollarsPerCoin} per coin`
+                    ) : null}
+                  </div>
                 </div>
               </div>
             )}

@@ -34,10 +34,12 @@ def get_market_data(ticker, timeframe="1d", period="1y"):
             ticker = "^" + ticker[6:]  # Convert "INDEX:GSPC" to "^GSPC"
         
         # Format crypto tickers correctly
-        if ticker.lower().startswith("crypto:"):
-            ticker = ticker[7:] + "-USD"  # Convert "CRYPTO:BTC" to "BTC-USD"
-        elif "-USD" not in ticker and any(ticker.upper().startswith(c) for c in get_major_cryptos()):
-            ticker = ticker.upper() + "-USD"  # Add -USD suffix if missing
+        if "-USD" not in ticker:
+            # Check if it's a known crypto symbol
+            if any(ticker.upper().startswith(c) for c in get_major_cryptos()):
+                ticker = ticker.upper() + "-USD"  # Add -USD suffix if missing
+            elif ticker.lower().startswith("crypto:"):
+                ticker = ticker[7:] + "-USD"  # Convert "CRYPTO:BTC" to "BTC-USD"
         
         # For intraday data, period is limited
         if timeframe in ["1m", "5m", "15m", "30m", "1h"]:
@@ -68,12 +70,29 @@ def get_market_data(ticker, timeframe="1d", period="1y"):
         # Convert Date to datetime 
         data['Date'] = pd.to_datetime(data['Date'])
         
+        # For crypto, fetch BTC price if not BTC itself
+        if "-USD" in ticker and not ticker.startswith("BTC-"):
+            try:
+                btc = yf.Ticker("BTC-USD")
+                btc_price = btc.history(period="1d").iloc[-1]['Close']
+                # Add BTC price as additional info
+                data['BTC_Price'] = btc_price
+            except Exception as e:
+                logger.warning(f"Could not fetch BTC price: {str(e)}")
+                data['BTC_Price'] = None
+        
         # Select and reorder relevant columns
+        columns = ['Date', 'Open', 'High', 'Low', 'Close']
         if 'Volume' in data.columns:
-            data = data[['Date', 'Open', 'High', 'Low', 'Close', 'Volume']]
-        else:
+            columns.append('Volume')
+        if 'BTC_Price' in data.columns:
+            columns.append('BTC_Price')
+        
+        data = data[columns]
+        
+        # Handle missing volume data
+        if 'Volume' not in data.columns:
             logger.warning(f"No volume data for {ticker}, using 0")
-            data = data[['Date', 'Open', 'High', 'Low', 'Close']]
             data['Volume'] = 0
         
         # Remove rows with NaN values
@@ -176,6 +195,11 @@ def get_major_cryptos():
         "SOL",    # Solana
         "DOT",    # Polkadot
         "MATIC",  # Polygon
-        "LINK"    # Chainlink
+        "LINK",   # Chainlink
+        "UNI",    # Uniswap
+        "AVAX",   # Avalanche
+        "ATOM",   # Cosmos
+        "ALGO",   # Algorand
+        "FTM"     # Fantom
     ]
     return major_cryptos

@@ -26,6 +26,13 @@ export const analyzeTicker = async (ticker, timeframe = '1d', period = '1y', cap
       formattedTicker = '^' + ticker.substring(6);
     }
     
+    // Format crypto tickers
+    if (ticker.includes('-USD')) {
+      formattedTicker = ticker;
+    } else if (ticker.toLowerCase().startsWith('crypto:')) {
+      formattedTicker = ticker.substring(7) + '-USD';
+    }
+    
     const response = await fetch(`${API_URL}/api/analyze/${formattedTicker}?timeframe=${timeframe}&period=${period}&capital=${capital}`, {
       method: 'POST',
       headers: {
