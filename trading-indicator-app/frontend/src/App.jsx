@@ -67,18 +67,18 @@ function App() {
   }
 
   const chartData = {
-    labels: data?.historical_data?.map(d => new Date(d.date).toLocaleTimeString()),
+    labels: data?.historical_data?.map(d => new Date(d.date).toLocaleTimeString()) || [],
     datasets: [
       {
         label: 'Price',
-        data: data?.historical_data?.map(d => d.Close),
+        data: data?.historical_data?.map(d => d.Close) || [],
         borderColor: '#BB86FC',
         backgroundColor: 'rgba(187, 134, 252, 0.1)',
         tension: 0.4,
       },
       {
         label: 'SMA 20',
-        data: data?.historical_data?.map(d => d.SMA_20),
+        data: data?.historical_data?.map(d => d.SMA20) || [],
         borderColor: '#03DAC6',
         backgroundColor: 'rgba(3, 218, 198, 0.1)',
         tension: 0.4,
@@ -144,25 +144,25 @@ function App() {
             <div className="space-y-4">
               <div className="flex justify-between items-center p-4 rounded-lg bg-opacity-20 bg-dark-primary">
                 <span className="text-dark-text">Signal</span>
-                <span className={`font-bold ${data.signal === 'BUY' ? 'text-green-500' : data.signal === 'SELL' ? 'text-red-500' : 'text-yellow-500'}`}>
-                  {data.signal}
+                <span className={`font-bold ${data?.signals?.signal === 'BUY' ? 'text-green-500' : data?.signals?.signal === 'SELL' ? 'text-red-500' : 'text-yellow-500'}`}>
+                  {data?.signals?.signal || 'NEUTRAL'}
                 </span>
               </div>
               <div className="flex justify-between items-center p-4 rounded-lg bg-opacity-20 bg-dark-secondary">
                 <span className="text-dark-text">Confidence</span>
-                <span className="font-bold text-dark-secondary">{data.confidence}%</span>
+                <span className="font-bold text-dark-secondary">{data?.signals?.confidence ? `${(data.signals.confidence * 100).toFixed(0)}%` : '0%'}</span>
               </div>
               <div className="flex justify-between items-center p-4 rounded-lg bg-opacity-20 bg-dark-surface">
                 <span className="text-dark-text">Entry Price</span>
-                <span className="font-bold text-dark-text">${data.entry_price}</span>
+                <span className="font-bold text-dark-text">${data?.signals?.entry_price?.toFixed(2) || '0.00'}</span>
               </div>
               <div className="flex justify-between items-center p-4 rounded-lg bg-opacity-20 bg-dark-surface">
                 <span className="text-dark-text">Stop Loss</span>
-                <span className="font-bold text-dark-text">${data.stop_loss}</span>
+                <span className="font-bold text-dark-text">${data?.signals?.stop_loss?.toFixed(2) || '0.00'}</span>
               </div>
               <div className="flex justify-between items-center p-4 rounded-lg bg-opacity-20 bg-dark-surface">
                 <span className="text-dark-text">Take Profit</span>
-                <span className="font-bold text-dark-text">${data.take_profit}</span>
+                <span className="font-bold text-dark-text">${data?.signals?.take_profit?.toFixed(2) || '0.00'}</span>
               </div>
             </div>
           </div>
@@ -173,19 +173,27 @@ function App() {
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 rounded-lg bg-opacity-20 bg-dark-surface">
                 <span className="text-dark-text-secondary">RSI</span>
-                <div className="text-2xl font-bold text-dark-text">{data.indicators.RSI.toFixed(2)}</div>
+                <div className="text-2xl font-bold text-dark-text">
+                  {data?.historical_data?.[data.historical_data.length - 1]?.RSI14?.toFixed(2) || '0.00'}
+                </div>
               </div>
               <div className="p-4 rounded-lg bg-opacity-20 bg-dark-surface">
                 <span className="text-dark-text-secondary">MACD</span>
-                <div className="text-2xl font-bold text-dark-text">{data.indicators.MACD.toFixed(2)}</div>
+                <div className="text-2xl font-bold text-dark-text">
+                  {data?.historical_data?.[data.historical_data.length - 1]?.MACD?.toFixed(2) || '0.00'}
+                </div>
               </div>
               <div className="p-4 rounded-lg bg-opacity-20 bg-dark-surface">
                 <span className="text-dark-text-secondary">SMA 20</span>
-                <div className="text-2xl font-bold text-dark-text">${data.indicators.SMA_20.toFixed(2)}</div>
+                <div className="text-2xl font-bold text-dark-text">
+                  ${data?.historical_data?.[data.historical_data.length - 1]?.SMA20?.toFixed(2) || '0.00'}
+                </div>
               </div>
               <div className="p-4 rounded-lg bg-opacity-20 bg-dark-surface">
                 <span className="text-dark-text-secondary">Volume</span>
-                <div className="text-2xl font-bold text-dark-text">{data.indicators.Volume.toLocaleString()}</div>
+                <div className="text-2xl font-bold text-dark-text">
+                  {data?.historical_data?.[data.historical_data.length - 1]?.Volume?.toLocaleString() || '0'}
+                </div>
               </div>
             </div>
           </div>
@@ -197,7 +205,7 @@ function App() {
               <div>
                 <h3 className="text-dark-text-secondary mb-2">Support Levels</h3>
                 <div className="flex flex-wrap gap-2">
-                  {data.support_levels.map((level, index) => (
+                  {(data?.signals?.support_levels || []).map((level, index) => (
                     <span key={index} className="px-3 py-1 rounded-full bg-opacity-20 bg-green-500 text-green-500">
                       ${level}
                     </span>
@@ -207,7 +215,7 @@ function App() {
               <div>
                 <h3 className="text-dark-text-secondary mb-2">Resistance Levels</h3>
                 <div className="flex flex-wrap gap-2">
-                  {data.resistance_levels.map((level, index) => (
+                  {(data?.signals?.resistance_levels || []).map((level, index) => (
                     <span key={index} className="px-3 py-1 rounded-full bg-opacity-20 bg-red-500 text-red-500">
                       ${level}
                     </span>
@@ -222,4 +230,4 @@ function App() {
   );
 }
 
-export default App; 
+export default App;
