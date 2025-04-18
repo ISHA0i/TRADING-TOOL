@@ -13,7 +13,7 @@ def get_market_data(ticker, timeframe="1d", period="1y"):
     Fetch market data using Yahoo Finance API
     
     Args:
-        ticker: Stock symbol
+        ticker: Stock/Forex/Index symbol (e.g., 'AAPL', 'EURUSD=X', '^GSPC')
         timeframe: Bar timeframe (1m, 5m, 15m, 30m, 1h, 1d, 1wk, 1mo)
         period: Data period (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max)
     
@@ -23,14 +23,30 @@ def get_market_data(ticker, timeframe="1d", period="1y"):
     try:
         logger.info(f"Fetching data for {ticker} with timeframe={timeframe}, period={period}")
         
+        # Format forex pairs correctly
+        if "/" in ticker:  # If forex pair is provided with slash (EUR/USD)
+            ticker = ticker.replace("/", "") + "=X"
+        elif len(ticker) == 6 and not ticker.endswith("=X"):  # If forex pair without slash (EURUSD)
+            ticker = ticker + "=X"
+            
+        # Format indices correctly
+        if ticker.lower().startswith("index:"):
+            ticker = "^" + ticker[6:]  # Convert "INDEX:GSPC" to "^GSPC"
+        
         # For intraday data, period is limited
         if timeframe in ["1m", "5m", "15m", "30m", "1h"]:
             if period not in ["1d", "5d", "1mo"]:
-                period = "5d"  # Default to 5 days for intraday data
+                period = "5d"
                 logger.warning(f"Adjusted period to 5d for intraday timeframe {timeframe}")
         
         # Fetch data
         ticker_obj = yf.Ticker(ticker)
+        info = ticker_obj.info
+        
+        if info is None or "regularMarketPrice" not in info:
+            logger.error(f"Invalid symbol: {ticker}")
+            return pd.DataFrame()
+            
         data = ticker_obj.history(period=period, interval=timeframe)
         
         if data.empty:
@@ -103,3 +119,36 @@ def get_sp500_tickers():
     except Exception as e:
         print(f"Error fetching S&P 500 tickers: {str(e)}")
         return []
+
+def get_forex_pairs():
+    """
+    Get a list of major forex pairs
+    
+    Returns:
+        List of forex pair symbols
+    """
+    major_pairs = [
+        "EUR/USD", "GBP/USD", "USD/JPY", "USD/CHF",
+        "USD/CAD", "AUD/USD", "NZD/USD", "EUR/GBP",
+        "EUR/JPY", "GBP/JPY", "AUD/JPY", "NZD/JPY"
+    ]
+    return major_pairs
+
+def get_major_indices():
+    """
+    Get a list of major stock indices
+    
+    Returns:
+        List of index symbols
+    """
+    indices = [
+        "^GSPC",   # S&P 500
+        "^DJI",    # Dow Jones
+        "^IXIC",   # NASDAQ
+        "^FTSE",   # FTSE 100
+        "^N225",   # Nikkei 225
+        "^HSI",    # Hang Seng
+        "^GDAXI",  # DAX
+        "^FCHI"    # CAC 40
+    ]
+    return indices

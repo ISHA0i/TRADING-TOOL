@@ -24,29 +24,29 @@ const SignalCard = ({ data }) => {
   const confidencePercent = Math.round(confidence * 100);
   
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-dark-surface border border-dark-border rounded-lg shadow-lg p-6">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">{ticker}</h2>
+        <h2 className="text-xl font-bold text-dark-text">{ticker}</h2>
         <div className="text-right">
-          <span className="text-gray-600 text-sm">Last Price</span>
-          <p className="text-lg font-semibold">${last_price.toFixed(2)}</p>
+          <span className="text-dark-text-secondary text-sm">Last Price</span>
+          <p className="text-lg font-semibold text-dark-text">${last_price.toFixed(2)}</p>
         </div>
       </div>
       
-      <div className="bg-gray-100 rounded-lg p-4 mb-4">
+      <div className="bg-dark-surface-2 rounded-lg p-4 mb-4">
         <div className="flex justify-between items-center">
-          <span className="text-gray-700">Signal</span>
-          <span className={`px-3 py-1 rounded-full text-white font-semibold ${getSignalColor()}`}>
+          <span className="text-dark-text">Signal</span>
+          <span className={`px-3 py-1 rounded-full text-dark-text font-semibold ${getSignalColor()}`}>
             {signal.replace('_', ' ')}
           </span>
         </div>
         
         <div className="mt-4">
           <div className="flex justify-between mb-1">
-            <span className="text-gray-700">Confidence</span>
-            <span className="text-gray-700 font-semibold">{confidencePercent}%</span>
+            <span className="text-dark-text">Confidence</span>
+            <span className="text-dark-text font-semibold">{confidencePercent}%</span>
           </div>
-          <div className="w-full bg-gray-300 rounded-full h-2.5">
+          <div className="w-full bg-dark-surface rounded-full h-2.5">
             <div 
               className={`h-2.5 rounded-full ${getSignalColor()}`} 
               style={{ width: `${confidencePercent}%` }}
@@ -56,10 +56,10 @@ const SignalCard = ({ data }) => {
       </div>
       
       <div>
-        <h3 className="text-lg font-semibold mb-2">Signal Reasons</h3>
+        <h3 className="text-lg font-semibold mb-2 text-dark-text">Signal Reasons</h3>
         <ul className="list-disc pl-5 space-y-1">
           {reasons.map((reason, index) => (
-            <li key={index} className="text-gray-700 text-sm">{reason}</li>
+            <li key={index} className="text-dark-text-secondary text-sm">{reason}</li>
           ))}
         </ul>
       </div>
@@ -67,4 +67,4 @@ const SignalCard = ({ data }) => {
   );
 };
 
-export default SignalCard; 
+export default SignalCard;

@@ -1,7 +1,7 @@
 import React from 'react';
 
-const CapitalUsageCard = ({ data }) => {
-  const { ticker, last_price, capital_plan } = data;
+const CapitalUsageCard = ({ data, symbolType }) => {
+  const { ticker, last_price, capital_plan, signals } = data;
   const { 
     total_capital, 
     risk_percent,
@@ -10,7 +10,10 @@ const CapitalUsageCard = ({ data }) => {
     position_size_units,
     stop_loss_usd,
     potential_profit_usd,
-    risk_reward_ratio
+    risk_reward_ratio,
+    kelly_criterion,
+    volatility_adjusted_size,
+    portfolio_risk
   } = capital_plan;
   
   // Format monetary values
@@ -26,46 +29,84 @@ const CapitalUsageCard = ({ data }) => {
   const formatPercent = (value) => {
     return value.toFixed(2) + '%';
   };
+
+  // Format units based on market type
+  const formatUnits = (units) => {
+    if (symbolType === 'forex') {
+      return units.toFixed(2) + ' lots';
+    }
+    return units.toFixed(4) + ' units';
+  };
   
   // Calculate percentage of total capital used in position
   const capitalUsedPercent = (position_size_usd / total_capital) * 100;
+
+  // Calculate market-specific metrics
+  const getMarketSpecificMetrics = () => {
+    if (symbolType === 'forex') {
+      const isJPYPair = ticker.includes('JPY');
+      const standardLotSize = 100000;
+      const lotValue = position_size_units / standardLotSize;
+      const pipValue = isJPYPair ? 0.01 : 0.0001;
+      const pipMoneyValue = (lotValue * standardLotSize * pipValue);
+      
+      return {
+        lotSize: lotValue.toFixed(2),
+        pipValue: formatMoney(pipMoneyValue)
+      };
+    }
+    return null;
+  };
+
+  const marketMetrics = getMarketSpecificMetrics();
   
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold mb-4">Capital Management</h2>
+    <div className="bg-dark-surface border border-dark-border rounded-lg shadow-lg p-6">
+      <h2 className="text-xl font-semibold mb-4 text-dark-text">Capital Management</h2>
       
       <div className="space-y-6">
         {/* Position Size */}
-        <div className="bg-gray-100 rounded-lg p-4">
+        <div className="bg-dark-surface-2 rounded-lg p-4">
           <div className="space-y-3">
             <div className="flex justify-between">
-              <span className="text-gray-700">Total Capital</span>
-              <span className="font-semibold">{formatMoney(total_capital)}</span>
+              <span className="text-dark-text-secondary">Total Capital</span>
+              <span className="font-semibold text-dark-text">{formatMoney(total_capital)}</span>
             </div>
             
             <div className="flex justify-between">
-              <span className="text-gray-700">Position Size</span>
-              <span className="font-semibold">{formatMoney(position_size_usd)}</span>
+              <span className="text-dark-text-secondary">Position Size</span>
+              <div className="text-right">
+                <div className="font-semibold text-dark-text">{formatMoney(position_size_usd)}</div>
+                <div className="text-sm text-dark-text-secondary">{formatUnits(position_size_units)}</div>
+              </div>
             </div>
             
-            <div className="flex justify-between">
-              <span className="text-gray-700">Units to Trade</span>
-              <span className="font-semibold">{position_size_units.toFixed(4)}</span>
-            </div>
+            {marketMetrics && (
+              <div className="flex justify-between">
+                <span className="text-dark-text-secondary">Lot Size</span>
+                <div className="text-right">
+                  <div className="font-semibold text-dark-text">{marketMetrics.lotSize} lots</div>
+                  <div className="text-sm text-dark-text-secondary">Per pip: {marketMetrics.pipValue}</div>
+                </div>
+              </div>
+            )}
             
             {/* Capital Usage Bar */}
             <div className="pt-2">
               <div className="flex justify-between mb-1">
-                <span className="text-xs text-gray-600">Capital Used</span>
-                <span className="text-xs text-gray-600 font-semibold">
+                <span className="text-xs text-dark-text-secondary">Capital Allocation</span>
+                <span className="text-xs text-dark-text-secondary font-semibold">
                   {formatPercent(capitalUsedPercent)}
                 </span>
               </div>
-              <div className="w-full bg-gray-300 rounded-full h-2">
+              <div className="w-full bg-dark-surface rounded-full h-2">
                 <div 
-                  className="h-2 rounded-full bg-blue-500" 
+                  className={`h-2 rounded-full ${capitalUsedPercent > max_position_size_percent ? 'bg-dark-error' : 'bg-dark-primary'}`}
                   style={{ width: `${Math.min(100, capitalUsedPercent)}%` }}
                 ></div>
+              </div>
+              <div className="text-xs text-dark-text-secondary mt-1">
+                Max allowed: {formatPercent(max_position_size_percent)}
               </div>
             </div>
           </div>
@@ -73,29 +114,59 @@ const CapitalUsageCard = ({ data }) => {
         
         {/* Risk Parameters */}
         <div>
-          <h3 className="text-md font-semibold mb-3">Risk Analysis</h3>
+          <h3 className="text-md font-semibold mb-3 text-dark-text">Risk Analysis</h3>
           
           <div className="space-y-3">
             <div className="flex justify-between">
-              <span className="text-gray-700">Risk Amount</span>
-              <span className="font-semibold text-red-600">{formatMoney(stop_loss_usd)}</span>
+              <span className="text-dark-text-secondary">Risk Amount</span>
+              <div className="text-right">
+                <div className="font-semibold text-red-500">{formatMoney(stop_loss_usd)}</div>
+                <div className="text-sm text-dark-text-secondary">{formatPercent(risk_percent)} of capital</div>
+              </div>
             </div>
             
             <div className="flex justify-between">
-              <span className="text-gray-700">Risk Percent</span>
-              <span className="font-semibold text-red-600">{formatPercent(risk_percent)}</span>
+              <span className="text-dark-text-secondary">Potential Profit</span>
+              <div className="text-right">
+                <div className="font-semibold text-green-500">{formatMoney(potential_profit_usd)}</div>
+                <div className="text-sm text-dark-text-secondary">
+                  {formatPercent((potential_profit_usd / total_capital) * 100)} of capital
+                </div>
+              </div>
             </div>
             
             <div className="flex justify-between">
-              <span className="text-gray-700">Potential Profit</span>
-              <span className="font-semibold text-green-600">{formatMoney(potential_profit_usd)}</span>
-            </div>
-            
-            <div className="flex justify-between border-t pt-2">
-              <span className="text-gray-700">Risk/Reward Ratio</span>
-              <span className="font-bold">
-                {risk_reward_ratio > 0 ? risk_reward_ratio.toFixed(2) + ':1' : 'N/A'}
+              <span className="text-dark-text-secondary">Portfolio Risk</span>
+              <span className={`font-semibold ${portfolio_risk > 2 ? 'text-red-500' : 'text-dark-text'}`}>
+                {formatPercent(portfolio_risk)}
               </span>
+            </div>
+            
+            <div className="pt-2 border-t border-dark-border">
+              <h4 className="text-sm font-medium text-dark-text mb-2">Advanced Metrics</h4>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-dark-text-secondary">Kelly Criterion</span>
+                  <span className="font-medium text-dark-text">
+                    {(kelly_criterion * 100).toFixed(1)}%
+                  </span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-dark-text-secondary">Volatility Adjusted Size</span>
+                  <span className="font-medium text-dark-text">
+                    {formatPercent(volatility_adjusted_size)}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-dark-text-secondary">Risk/Reward Ratio</span>
+                  <span className="font-medium text-dark-text">
+                    {risk_reward_ratio.toFixed(2)}:1
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -104,4 +175,4 @@ const CapitalUsageCard = ({ data }) => {
   );
 };
 
-export default CapitalUsageCard; 
+export default CapitalUsageCard;

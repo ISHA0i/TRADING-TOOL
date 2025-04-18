@@ -2,11 +2,12 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import uvicorn
-from typing import Optional
+from typing import Optional, List
 import logging
 import traceback
 import json
 import numpy as np
+from utils.fetch_data import get_forex_pairs, get_major_indices
 
 # Set up logging
 logging.basicConfig(
@@ -150,6 +151,11 @@ class AnalysisRequest(BaseModel):
 async def root():
     return {"message": "Trading Indicator API is running"}
 
+@app.get("/api")
+async def api_root():
+    """Root endpoint for API status check"""
+    return {"status": "ok", "message": "Trading Indicator API is running"}
+
 @app.get("/api/analyze/{ticker}")
 @app.post("/api/analyze/{ticker}")
 async def analyze_ticker(
@@ -172,7 +178,7 @@ async def analyze_ticker(
         
         # Pre-process data to handle NaN values
         data = data.replace([np.inf, -np.inf], np.nan)
-        data = data.fillna(method='ffill').fillna(method='bfill')
+        data = data.ffill().bfill()  # Updated to use recommended methods
         
         # Calculate technical indicators
         try:
@@ -183,7 +189,7 @@ async def analyze_ticker(
                 
             # Clean up any remaining NaN values after indicator calculation
             indicators_data = indicators_data.replace([np.inf, -np.inf], np.nan)
-            indicators_data = indicators_data.fillna(method='ffill').fillna(method='bfill')
+            indicators_data = indicators_data.ffill().bfill()  # Updated to use recommended methods
             
         except Exception as e:
             logger.error(f"Error calculating indicators: {str(e)}\n{traceback.format_exc()}")
@@ -249,6 +255,32 @@ async def analyze_ticker(
         raise HTTPException(
             status_code=500,
             detail=f"An unexpected error occurred while analyzing {ticker}: {str(e)}"
+        )
+
+@app.get("/api/forex/pairs")
+async def get_available_forex_pairs():
+    """Get list of available forex pairs"""
+    try:
+        pairs = get_forex_pairs()
+        return {"pairs": pairs}
+    except Exception as e:
+        logger.error(f"Error getting forex pairs: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting forex pairs: {str(e)}"
+        )
+
+@app.get("/api/indices")
+async def get_available_indices():
+    """Get list of major stock indices"""
+    try:
+        indices = get_major_indices()
+        return {"indices": indices}
+    except Exception as e:
+        logger.error(f"Error getting indices: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting indices: {str(e)}"
         )
 
 if __name__ == "__main__":
