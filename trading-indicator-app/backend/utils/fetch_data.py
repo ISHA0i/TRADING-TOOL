@@ -13,7 +13,7 @@ def get_market_data(ticker, timeframe="1d", period="1y"):
     Fetch market data using Yahoo Finance API
     
     Args:
-        ticker: Stock/Forex/Index symbol (e.g., 'AAPL', 'EURUSD=X', '^GSPC')
+        ticker: Stock/Forex/Crypto/Index symbol (e.g., 'AAPL', 'EURUSD=X', 'BTC-USD', '^GSPC')
         timeframe: Bar timeframe (1m, 5m, 15m, 30m, 1h, 1d, 1wk, 1mo)
         period: Data period (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max)
     
@@ -32,6 +32,12 @@ def get_market_data(ticker, timeframe="1d", period="1y"):
         # Format indices correctly
         if ticker.lower().startswith("index:"):
             ticker = "^" + ticker[6:]  # Convert "INDEX:GSPC" to "^GSPC"
+        
+        # Format crypto tickers correctly
+        if ticker.lower().startswith("crypto:"):
+            ticker = ticker[7:] + "-USD"  # Convert "CRYPTO:BTC" to "BTC-USD"
+        elif "-USD" not in ticker and any(ticker.upper().startswith(c) for c in get_major_cryptos()):
+            ticker = ticker.upper() + "-USD"  # Add -USD suffix if missing
         
         # For intraday data, period is limited
         if timeframe in ["1m", "5m", "15m", "30m", "1h"]:
@@ -152,3 +158,24 @@ def get_major_indices():
         "^FCHI"    # CAC 40
     ]
     return indices
+
+def get_major_cryptos():
+    """
+    Get a list of major cryptocurrencies
+    
+    Returns:
+        List of cryptocurrency symbols
+    """
+    major_cryptos = [
+        "BTC",    # Bitcoin
+        "ETH",    # Ethereum
+        "BNB",    # Binance Coin
+        "XRP",    # Ripple
+        "ADA",    # Cardano
+        "DOGE",   # Dogecoin
+        "SOL",    # Solana
+        "DOT",    # Polkadot
+        "MATIC",  # Polygon
+        "LINK"    # Chainlink
+    ]
+    return major_cryptos
