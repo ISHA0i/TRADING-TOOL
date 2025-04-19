@@ -8,6 +8,22 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def format_indian_symbol(ticker):
+    """
+    Format Indian stock symbols for Yahoo Finance
+    
+    Args:
+        ticker: Stock symbol (e.g., 'RELIANCE', 'HDFC', 'TCS')
+    
+    Returns:
+        Formatted ticker symbol
+    """
+    if ticker.endswith('.NS') or ticker.endswith('.BO'):
+        return ticker
+    
+    # Default to NSE if no exchange specified
+    return f"{ticker}.NS"
+
 def get_market_data(ticker, timeframe="1d", period="1y"):
     """
     Fetch market data using Yahoo Finance API
@@ -24,84 +40,87 @@ def get_market_data(ticker, timeframe="1d", period="1y"):
         logger.info(f"Fetching data for {ticker} with timeframe={timeframe}, period={period}")
         
         # Format forex pairs correctly
-        if "/" in ticker:  # If forex pair is provided with slash (EUR/USD)
+        if "/" in ticker:
             ticker = ticker.replace("/", "") + "=X"
-        elif len(ticker) == 6 and not ticker.endswith("=X"):  # If forex pair without slash (EURUSD)
+        elif len(ticker) == 6 and not ticker.endswith("=X"):
             ticker = ticker + "=X"
             
         # Format indices correctly
         if ticker.lower().startswith("index:"):
-            ticker = "^" + ticker[6:]  # Convert "INDEX:GSPC" to "^GSPC"
+            ticker = "^" + ticker[6:]
+        
+        # Format Indian stock symbols
+        if not any(c in ticker for c in ['^', '=X', '-USD', '.NS', '.BO']):
+            ticker = format_indian_symbol(ticker)
         
         # Format crypto tickers correctly
         if "-USD" not in ticker:
-            # Check if it's a known crypto symbol
             if any(ticker.upper().startswith(c) for c in get_major_cryptos()):
-                ticker = ticker.upper() + "-USD"  # Add -USD suffix if missing
+                ticker = ticker.upper() + "-USD"
             elif ticker.lower().startswith("crypto:"):
-                ticker = ticker[7:] + "-USD"  # Convert "CRYPTO:BTC" to "BTC-USD"
+                ticker = ticker[7:] + "-USD"
+
+        # Adjust timeframe for Indian market stocks
+        is_indian_stock = ticker.endswith('.NS') or ticker.endswith('.BO')
+        if is_indian_stock and timeframe in ["1m", "5m", "15m", "30m", "1h"]:
+            logger.warning(f"Intraday data for Indian stocks might be limited. Adjusting timeframe to 1d")
+            timeframe = "1d"
+            if period in ["1d", "5d"]:
+                period = "1mo"
         
-        # For intraday data, period is limited
-        if timeframe in ["1m", "5m", "15m", "30m", "1h"]:
-            if period not in ["1d", "5d", "1mo"]:
-                period = "5d"
-                logger.warning(f"Adjusted period to 5d for intraday timeframe {timeframe}")
+        # Fetch data with error handling and retries
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                ticker_obj = yf.Ticker(ticker)
+                
+                # First try to get info to validate the symbol
+                info = ticker_obj.info
+                if info is None or "regularMarketPrice" not in info:
+                    logger.error(f"Invalid symbol: {ticker}")
+                    return pd.DataFrame()
+
+                # Then fetch historical data
+                data = ticker_obj.history(period=period, interval=timeframe)
+                
+                if data.empty:
+                    logger.error(f"No data returned for {ticker}")
+                    if attempt < max_retries - 1:
+                        logger.info(f"Retrying... (attempt {attempt + 1}/{max_retries})")
+                        continue
+                    return pd.DataFrame()
+                
+                break  # Success, exit retry loop
+                
+            except Exception as e:
+                logger.error(f"Error on attempt {attempt + 1}: {str(e)}")
+                if attempt < max_retries - 1:
+                    continue
+                return pd.DataFrame()
         
-        # Fetch data
-        ticker_obj = yf.Ticker(ticker)
-        info = ticker_obj.info
-        
-        if info is None or "regularMarketPrice" not in info:
-            logger.error(f"Invalid symbol: {ticker}")
-            return pd.DataFrame()
-            
-        data = ticker_obj.history(period=period, interval=timeframe)
-        
-        if data.empty:
-            logger.error(f"No data returned for {ticker}")
-            return pd.DataFrame()
-        
-        # Rename columns to standard format
-        data.columns = [col.title() for col in data.columns]
-        
-        # Reset index to make Date a column
+        # Post-process the data
         data = data.reset_index()
-        
-        # Convert Date to datetime 
+        data.columns = [col.title() for col in data.columns]
         data['Date'] = pd.to_datetime(data['Date'])
         
-        # For crypto, fetch BTC price if not BTC itself
-        if "-USD" in ticker and not ticker.startswith("BTC-"):
-            try:
-                btc = yf.Ticker("BTC-USD")
-                btc_price = btc.history(period="1d").iloc[-1]['Close']
-                # Add BTC price as additional info
-                data['BTC_Price'] = btc_price
-            except Exception as e:
-                logger.warning(f"Could not fetch BTC price: {str(e)}")
-                data['BTC_Price'] = None
-        
-        # Select and reorder relevant columns
-        columns = ['Date', 'Open', 'High', 'Low', 'Close']
-        if 'Volume' in data.columns:
-            columns.append('Volume')
-        if 'BTC_Price' in data.columns:
-            columns.append('BTC_Price')
-        
-        data = data[columns]
-        
         # Handle missing volume data
-        if 'Volume' not in data.columns:
-            logger.warning(f"No volume data for {ticker}, using 0")
-            data['Volume'] = 0
+        if 'Volume' not in data.columns or (data['Volume'] == 0).all():
+            logger.warning(f"No volume data for {ticker}, using synthetic volume")
+            # Create synthetic volume based on price movement
+            price_change = data['Close'].pct_change().abs()
+            data['Volume'] = ((price_change + 0.001) * 100000).fillna(50000).astype(int)
         
-        # Remove rows with NaN values
+        # Clean up data
         data = data.replace([np.inf, -np.inf], np.nan)
         data = data.dropna()
         
-        logger.info(f"Successfully fetched {len(data)} rows of data for {ticker}")
-        return data
-    
+        if len(data) > 0:
+            logger.info(f"Successfully fetched {len(data)} rows of data for {ticker}")
+            return data
+        else:
+            logger.error(f"No valid data after processing for {ticker}")
+            return pd.DataFrame()
+        
     except Exception as e:
         logger.error(f"Error fetching data for {ticker}: {str(e)}")
         return pd.DataFrame()
@@ -174,7 +193,12 @@ def get_major_indices():
         "^N225",   # Nikkei 225
         "^HSI",    # Hang Seng
         "^GDAXI",  # DAX
-        "^FCHI"    # CAC 40
+        "^FCHI",   # CAC 40
+        "^BSESN",  # BSE SENSEX
+        "^NSEI",   # NIFTY 50
+        "^NSEBANK", # NIFTY BANK
+        "^CNXIT",  # NIFTY IT
+        "^CNXAUTO" # NIFTY AUTO
     ]
     return indices
 
@@ -203,3 +227,29 @@ def get_major_cryptos():
         "FTM"     # Fantom
     ]
     return major_cryptos
+
+def get_major_indian_stocks():
+    """
+    Get a list of major Indian stocks from both NSE and BSE
+    
+    Returns:
+        List of stock symbols
+    """
+    major_stocks = [
+        "RELIANCE.NS",  # Reliance Industries
+        "TCS.NS",       # Tata Consultancy Services
+        "HDFCBANK.NS",  # HDFC Bank
+        "INFY.NS",      # Infosys
+        "HINDUNILVR.NS",# Hindustan Unilever
+        "ICICIBANK.NS", # ICICI Bank
+        "SBIN.NS",      # State Bank of India
+        "BHARTIARTL.NS",# Bharti Airtel
+        "ITC.NS",       # ITC Limited
+        "KOTAKBANK.NS", # Kotak Mahindra Bank
+        "WIPRO.NS",     # Wipro
+        "AXISBANK.NS",  # Axis Bank
+        "MARUTI.NS",    # Maruti Suzuki
+        "HCLTECH.NS",   # HCL Technologies
+        "ASIANPAINT.NS" # Asian Paints
+    ]
+    return major_stocks

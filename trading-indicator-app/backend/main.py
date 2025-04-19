@@ -7,7 +7,7 @@ import logging
 import traceback
 import json
 import numpy as np
-from utils.fetch_data import get_forex_pairs, get_major_indices
+from utils.fetch_data import get_forex_pairs, get_major_indices, get_major_indian_stocks, get_sp500_tickers
 
 # Set up logging
 logging.basicConfig(
@@ -281,6 +281,53 @@ async def get_available_indices():
         raise HTTPException(
             status_code=500,
             detail=f"Error getting indices: {str(e)}"
+        )
+
+@app.get("/api/indian-stocks")
+async def get_available_indian_stocks():
+    """Get list of major Indian stocks"""
+    try:
+        stocks = get_major_indian_stocks()
+        return {"stocks": stocks}
+    except Exception as e:
+        logger.error(f"Error getting Indian stocks: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting Indian stocks: {str(e)}"
+        )
+
+@app.get("/api/us-stocks")
+async def get_available_us_stocks():
+    """Get list of major US stocks and S&P 500 components"""
+    try:
+        # First get some popular US stocks that we want to show at the top
+        popular_stocks = [
+            {"symbol": "AAPL", "name": "Apple Inc."},
+            {"symbol": "MSFT", "name": "Microsoft Corporation"},
+            {"symbol": "GOOGL", "name": "Alphabet Inc."},
+            {"symbol": "AMZN", "name": "Amazon.com Inc."},
+            {"symbol": "META", "name": "Meta Platforms Inc."},
+            {"symbol": "NVDA", "name": "NVIDIA Corporation"},
+            {"symbol": "TSLA", "name": "Tesla Inc."},
+            {"symbol": "JPM", "name": "JPMorgan Chase & Co."},
+            {"symbol": "V", "name": "Visa Inc."},
+            {"symbol": "WMT", "name": "Walmart Inc."}
+        ]
+        
+        # Then get S&P 500 components
+        sp500_tickers = get_sp500_tickers()
+        sp500_stocks = [{"symbol": ticker, "name": ticker} for ticker in sp500_tickers 
+                       if not any(ps["symbol"] == ticker for ps in popular_stocks)]
+        
+        return {
+            "popular": popular_stocks,
+            "sp500": sp500_stocks
+        }
+    except Exception as e:
+        logger.error(f"Error getting US stocks: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting US stocks: {str(e)}"
         )
 
 if __name__ == "__main__":

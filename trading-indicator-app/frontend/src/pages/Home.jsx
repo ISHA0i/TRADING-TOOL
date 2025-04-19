@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { analyzeTicker, checkApiStatus } from '../api';
+import { analyzeTicker, checkApiStatus, getUSStocks } from '../api';
 import SignalCard from '../components/SignalCard';
 import RiskRewardCard from '../components/RiskRewardCard';
 import CapitalUsageCard from '../components/CapitalUsageCard';
@@ -16,10 +16,28 @@ const MAJOR_INDICES = [
   { symbol: "^DJI", name: "Dow Jones" },
   { symbol: "^IXIC", name: "NASDAQ" },
   { symbol: "^FTSE", name: "FTSE 100" },
+  { symbol: "^BSESN", name: "BSE SENSEX" },
+  { symbol: "^NSEI", name: "NIFTY 50" },
+  { symbol: "^NSEBANK", name: "NIFTY BANK" },
+  { symbol: "^CNXIT", name: "NIFTY IT" },
+  { symbol: "^CNXAUTO", name: "NIFTY AUTO" },
   { symbol: "^N225", name: "Nikkei 225" },
   { symbol: "^HSI", name: "Hang Seng" },
   { symbol: "^GDAXI", name: "DAX" },
   { symbol: "^FCHI", name: "CAC 40" }
+];
+
+const MAJOR_INDIAN_STOCKS = [
+  { symbol: "RELIANCE.NS", name: "Reliance Industries" },
+  { symbol: "TCS.NS", name: "Tata Consultancy Services" },
+  { symbol: "HDFCBANK.NS", name: "HDFC Bank" },
+  { symbol: "INFY.NS", name: "Infosys" },
+  { symbol: "HINDUNILVR.NS", name: "Hindustan Unilever" },
+  { symbol: "ICICIBANK.NS", name: "ICICI Bank" },
+  { symbol: "SBIN.NS", name: "State Bank of India" },
+  { symbol: "BHARTIARTL.NS", name: "Bharti Airtel" },
+  { symbol: "ITC.NS", name: "ITC Limited" },
+  { symbol: "KOTAKBANK.NS", name: "Kotak Mahindra Bank" }
 ];
 
 const CRYPTO_PAIRS = [
@@ -41,7 +59,10 @@ function Home() {
   const [customSymbol, setCustomSymbol] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(60); // in seconds
-  
+  const [marketRegion, setMarketRegion] = useState('us'); // Add market region state
+  const [usStocks, setUSStocks] = useState({ popular: [], sp500: [] });
+  const [loadingStocks, setLoadingStocks] = useState(false);
+
   // Check API status on load
   useEffect(() => {
     const checkStatus = async () => {
@@ -55,6 +76,25 @@ function Home() {
     
     checkStatus();
   }, []);
+
+  // Fetch US stocks when market region changes to US
+  useEffect(() => {
+    const fetchUSStocks = async () => {
+      if (marketRegion === 'us' && symbolType === 'stock' && usStocks.popular.length === 0) {
+        setLoadingStocks(true);
+        try {
+          const data = await getUSStocks();
+          setUSStocks(data);
+        } catch (error) {
+          console.error('Error fetching US stocks:', error);
+          setError('Failed to load US stocks list');
+        }
+        setLoadingStocks(false);
+      }
+    };
+
+    fetchUSStocks();
+  }, [marketRegion, symbolType]);
 
   // Auto-refresh effect
   useEffect(() => {
@@ -111,6 +151,30 @@ function Home() {
 
   const getSymbolOptions = () => {
     switch (symbolType) {
+      case 'stock':
+        if (marketRegion === 'india') {
+          return MAJOR_INDIAN_STOCKS.map(stock => (
+            <option key={stock.symbol} value={stock.symbol}>{stock.name} ({stock.symbol})</option>
+          ));
+        } else if (marketRegion === 'us') {
+          return (
+            <>
+              <optgroup label="Popular Stocks">
+                {usStocks.popular.map(stock => (
+                  <option key={stock.symbol} value={stock.symbol}>{stock.name} ({stock.symbol})</option>
+                ))}
+              </optgroup>
+              {usStocks.sp500.length > 0 && (
+                <optgroup label="S&P 500 Components">
+                  {usStocks.sp500.map(stock => (
+                    <option key={stock.symbol} value={stock.symbol}>{stock.name}</option>
+                  ))}
+                </optgroup>
+              )}
+            </>
+          );
+        }
+        return [];
       case 'forex':
         return FOREX_PAIRS.map(pair => (
           <option key={pair} value={pair}>{pair}</option>
@@ -155,6 +219,9 @@ function Home() {
                     setSymbolType(e.target.value);
                     setTicker('');
                     setCustomSymbol('');
+                    if (e.target.value !== 'stock') {
+                      setMarketRegion('us');
+                    }
                   }}
                 >
                   <option value="stock">Stocks</option>
@@ -164,20 +231,55 @@ function Home() {
                 </select>
               </div>
 
+              {/* Market Region Selection for Stocks */}
+              {symbolType === 'stock' && (
+                <div>
+                  <label className="block text-sm font-medium text-dark-text-secondary mb-1">
+                    Market Region
+                  </label>
+                  <select
+                    className="w-full p-2 bg-dark-surface-2 border border-dark-border rounded-md text-dark-text focus:border-dark-primary focus:ring-dark-primary"
+                    value={marketRegion}
+                    onChange={(e) => {
+                      setMarketRegion(e.target.value);
+                      setTicker('');
+                      setCustomSymbol('');
+                    }}
+                  >
+                    <option value="us">US Market</option>
+                    <option value="india">Indian Market</option>
+                  </select>
+                </div>
+              )}
+
               {/* Symbol Selection */}
-              <div>
+              <div className={symbolType === 'stock' ? 'lg:col-span-2' : ''}>
                 <label className="block text-sm font-medium text-dark-text-secondary mb-1">
                   {symbolType === 'stock' ? 'Stock Symbol' : symbolType === 'forex' ? 'Currency Pair' : symbolType === 'crypto' ? 'Cryptocurrency' : 'Index'}
                 </label>
                 {symbolType === 'stock' ? (
-                  <input
-                    type="text"
-                    className="w-full p-2 bg-dark-surface-2 border border-dark-border rounded-md text-dark-text focus:border-dark-primary focus:ring-dark-primary"
-                    value={customSymbol}
-                    onChange={handleCustomSymbolChange}
-                    placeholder="Enter stock symbol (e.g., AAPL)"
-                    required
-                  />
+                  <div className="flex gap-2">
+                    <select
+                      className="w-full p-2 bg-dark-surface-2 border border-dark-border rounded-md text-dark-text focus:border-dark-primary focus:ring-dark-primary disabled:opacity-50"
+                      value={ticker}
+                      onChange={handleSymbolSelect}
+                      disabled={loadingStocks}
+                    >
+                      <option value="">
+                        {loadingStocks ? 'Loading stocks...' : 'Select a stock or enter custom symbol'}
+                      </option>
+                      {getSymbolOptions()}
+                    </select>
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        className="w-full p-2 bg-dark-surface-2 border border-dark-border rounded-md text-dark-text focus:border-dark-primary focus:ring-dark-primary"
+                        value={customSymbol}
+                        onChange={handleCustomSymbolChange}
+                        placeholder={marketRegion === 'india' ? "Custom symbol (e.g., TATAMOTORS.NS)" : "Custom symbol (e.g., AAPL)"}
+                      />
+                    </div>
+                  </div>
                 ) : (
                   <select
                     className="w-full p-2 bg-dark-surface-2 border border-dark-border rounded-md text-dark-text focus:border-dark-primary focus:ring-dark-primary"
