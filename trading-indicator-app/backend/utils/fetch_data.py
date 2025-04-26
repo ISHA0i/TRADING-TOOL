@@ -3,10 +3,22 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import logging
+import os
+from .providers.angel_one_provider import AngelOneProvider
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Initialize Angel One provider if credentials are available
+angel_one = None
+if all(key in os.environ for key in ['ANGEL_API_KEY', 'ANGEL_CLIENT_ID', 'ANGEL_SECRET_KEY', 'ANGEL_TOTP_KEY']):
+    angel_one = AngelOneProvider(
+        api_key=os.environ['ANGEL_API_KEY'],
+        client_id=os.environ['ANGEL_CLIENT_ID'],
+        secret_key=os.environ['ANGEL_SECRET_KEY'],
+        totp_key=os.environ['ANGEL_TOTP_KEY']
+    )
 
 def format_indian_symbol(ticker):
     """
@@ -26,7 +38,7 @@ def format_indian_symbol(ticker):
 
 def get_market_data(ticker, timeframe="1d", period="1y"):
     """
-    Fetch market data using Yahoo Finance API
+    Fetch market data using either Angel One (for Indian stocks) or Yahoo Finance API
     
     Args:
         ticker: Stock/Forex/Crypto/Index symbol (e.g., 'AAPL', 'EURUSD=X', 'BTC-USD', '^GSPC')
@@ -60,8 +72,54 @@ def get_market_data(ticker, timeframe="1d", period="1y"):
             elif ticker.lower().startswith("crypto:"):
                 ticker = ticker[7:] + "-USD"
 
-        # Adjust timeframe for Indian market stocks
+        # Use Angel One for Indian stocks if provider is available
         is_indian_stock = ticker.endswith('.NS') or ticker.endswith('.BO')
+        if is_indian_stock and angel_one:
+            # Convert timeframe to Angel One format
+            timeframe_map = {
+                "1m": "ONE_MINUTE",
+                "5m": "FIVE_MINUTE",
+                "15m": "FIFTEEN_MINUTE",
+                "30m": "THIRTY_MINUTE",
+                "1h": "ONE_HOUR",
+                "1d": "ONE_DAY"
+            }
+            
+            # Calculate date range based on period
+            end_date = datetime.now()
+            if period == "1d":
+                start_date = end_date - timedelta(days=1)
+            elif period == "5d":
+                start_date = end_date - timedelta(days=5)
+            elif period == "1mo":
+                start_date = end_date - timedelta(days=30)
+            elif period == "3mo":
+                start_date = end_date - timedelta(days=90)
+            elif period == "6mo":
+                start_date = end_date - timedelta(days=180)
+            elif period == "1y":
+                start_date = end_date - timedelta(days=365)
+            elif period == "2y":
+                start_date = end_date - timedelta(days=730)
+            else:
+                start_date = end_date - timedelta(days=365)  # Default to 1 year
+                
+            # Remove .NS or .BO suffix and format for Angel One
+            base_symbol = ticker.replace('.NS', '').replace('.BO', '')
+            angel_symbol = angel_one.format_symbol(base_symbol)
+            
+            # Get data from Angel One
+            data = angel_one.get_historical_data(
+                symbol=angel_symbol,
+                timeframe=timeframe_map.get(timeframe, "ONE_DAY"),
+                from_date=start_date,
+                to_date=end_date
+            )
+            
+            if not data.empty:
+                return data
+
+        # Adjust timeframe for Indian market stocks
         if is_indian_stock and timeframe in ["1m", "5m", "15m", "30m", "1h"]:
             logger.warning(f"Intraday data for Indian stocks might be limited. Adjusting timeframe to 1d")
             timeframe = "1d"

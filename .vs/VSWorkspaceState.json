@@ -1,0 +1,11 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\.venv",
+    "\\trading-indicator-app",
+    "\\trading-indicator-app\\backend",
+    "\\trading-indicator-app\\frontend"
+  ],
+  "SelectedNode": "\\trading-indicator-app\\backend\\main.py",
+  "PreviewInSolutionExplorer": false
+}
