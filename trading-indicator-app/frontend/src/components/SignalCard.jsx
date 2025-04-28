@@ -19,8 +19,8 @@ const SignalCard = ({ data, symbolType = 'stock' }) => {
   // Check if signals object is valid
   const hasSignals = signals && 
     typeof signals === 'object' && 
-    !signals.error && 
-    Object.keys(signals).length > 0;
+    signals.signal && 
+    signals.confidence;
   
   // Format date string
   const formatDate = (dateString) => {
@@ -54,33 +54,44 @@ const SignalCard = ({ data, symbolType = 'stock' }) => {
   
   // Get color based on signal strength
   const getSignalColor = (value) => {
-    if (typeof value !== 'number') return 'text-dark-text';
+    if (value === undefined || value === null || typeof value !== 'number') return 'text-dark-text';
     if (value >= 0.7) return 'text-green-500';
-    if (value >= 0.4) return 'text-yellow-500';
+    if (value >= 0.4) return 'text-green-400';
     if (value >= 0) return 'text-dark-text-secondary';
     if (value >= -0.4) return 'text-dark-text-secondary';
     if (value >= -0.7) return 'text-yellow-500';
     return 'text-red-500';
   };
   
-  // Get final signal text
-  const getSignalText = (signal) => {
-    if (typeof signal !== 'number') return 'NEUTRAL';
-    if (signal > 0.7) return 'STRONG BUY';
-    if (signal > 0.3) return 'BUY';
-    if (signal > -0.3) return 'NEUTRAL';
-    if (signal > -0.7) return 'SELL';
-    return 'STRONG SELL';
+  // Get signal type color
+  const getSignalTypeColor = (signalType) => {
+    if (!signalType) return 'text-dark-text-secondary';
+    
+    if (signalType.includes('BUY') || signalType === 'STRONG_BUY') {
+      return signalType.includes('STRONG') ? 'text-green-500' : 'text-green-400';
+    } else if (signalType.includes('SELL') || signalType === 'STRONG_SELL') {
+      return signalType.includes('STRONG') ? 'text-red-500' : 'text-red-400';
+    }
+    return 'text-dark-text-secondary';
   };
   
-  // Get color for final signal
-  const getFinalSignalColor = (signal) => {
-    if (typeof signal !== 'number') return 'text-dark-text-secondary';
-    if (signal > 0.7) return 'text-green-500';
-    if (signal > 0.3) return 'text-green-400';
-    if (signal > -0.3) return 'text-dark-text-secondary';
-    if (signal > -0.7) return 'text-red-400';
-    return 'text-red-500';
+  // Format signal type for display
+  const formatSignalType = (signalType) => {
+    if (!signalType) return 'NEUTRAL';
+    return signalType.replace('_', ' ');
+  };
+  
+  // Get signal metrics for display
+  const getSignalMetrics = () => {
+    if (!signals.signal_metrics) return [];
+    
+    return Object.entries(signals.signal_metrics)
+      .filter(([key, value]) => typeof value === 'number')
+      .map(([key, value]) => ({
+        name: key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
+        value: value,
+        key: key
+      }));
   };
   
   return (
@@ -109,42 +120,51 @@ const SignalCard = ({ data, symbolType = 'stock' }) => {
           <div className="mb-6 flex items-center justify-center bg-dark-surface-2 rounded-lg p-4">
             <div className="text-center">
               <p className="text-sm text-dark-text-secondary mb-1">Signal</p>
-              <p className={`text-3xl font-bold ${getFinalSignalColor(signals.final_signal)}`}>
-                {getSignalText(signals.final_signal)}
+              <p className={`text-3xl font-bold ${getSignalTypeColor(signals.signal)}`}>
+                {formatSignalType(signals.signal)}
               </p>
               <p className="text-xs text-dark-text-secondary mt-1">
-                Confidence: {typeof signals.signal_strength === 'number' ? `${(signals.signal_strength * 100).toFixed(0)}%` : 'N/A'}
+                Confidence: {typeof signals.confidence === 'number' ? `${(signals.confidence * 100).toFixed(0)}%` : 'N/A'}
               </p>
             </div>
           </div>
+          
+          {signals.reasons && signals.reasons.length > 0 && (
+            <div className="mb-6">
+              <h4 className="text-sm font-medium text-dark-text-secondary mb-2">Reasons</h4>
+              <ul className="text-sm text-dark-text space-y-2 list-disc pl-5">
+                {signals.reasons.map((reason, index) => (
+                  <li key={index}>{reason}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           
           <div>
             <h4 className="text-sm font-medium text-dark-text-secondary mb-2">Signal Components</h4>
             
             <div className="space-y-3">
-              {Object.entries(signals)
-                .filter(([key]) => !['final_signal', 'signal_strength'].includes(key))
-                .map(([key, value]) => (
-                  <div key={key} className="flex justify-between items-center">
-                    <span className="text-sm text-dark-text">
-                      {key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                    </span>
-                    <div className="flex items-center">
-                      <div className="w-16 h-2 bg-dark-surface-2 rounded-full mr-2 overflow-hidden">
-                        <div
-                          className={`h-full ${value > 0 ? 'bg-green-500' : 'bg-red-500'}`}
-                          style={{
-                            width: `${Math.abs(value) * 100}%`,
-                            marginLeft: value > 0 ? '50%' : `${(1 - Math.abs(value)) * 50}%`
-                          }}
-                        ></div>
-                      </div>
-                      <span className={`text-sm font-medium ${getSignalColor(value)}`}>
-                        {typeof value === 'number' ? value.toFixed(2) : 'N/A'}
-                      </span>
+              {getSignalMetrics().map((metric) => (
+                <div key={metric.key} className="flex justify-between items-center">
+                  <span className="text-sm text-dark-text">
+                    {metric.name}
+                  </span>
+                  <div className="flex items-center">
+                    <div className="w-16 h-2 bg-dark-surface-2 rounded-full mr-2 overflow-hidden">
+                      <div
+                        className={`h-full ${metric.value > 0 ? 'bg-green-500' : 'bg-red-500'}`}
+                        style={{
+                          width: `${Math.min(Math.abs(metric.value), 1) * 100}%`,
+                          marginLeft: metric.value > 0 ? '50%' : `${(1 - Math.min(Math.abs(metric.value), 1)) * 50}%`
+                        }}
+                      ></div>
                     </div>
+                    <span className={`text-sm font-medium ${getSignalColor(metric.value)}`}>
+                      {metric.value.toFixed(2)}
+                    </span>
                   </div>
-                ))}
+                </div>
+              ))}
             </div>
           </div>
         </>

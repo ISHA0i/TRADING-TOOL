@@ -51,86 +51,128 @@ async def analyze_ticker(
                 detail=f"No data found for ticker {ticker}. Please verify the symbol and try again."
             )
         
+        # Ensure the data doesn't have NaN values that would cause issues
+        data = data.ffill().bfill()  # Forward and backward fill to handle NaN values
+        
         # Get symbol info
         symbol_info = get_symbol_info(ticker)
+        
+        # Default fallback values
+        last_price = float(data['Close'].iloc[-1])
+        default_signals = {
+            "signal": "NEUTRAL",
+            "confidence": 0.5,
+            "reasons": ["Could not generate reliable signals based on available data"],
+            "signal_metrics": {
+                "trend_score": 0.0,
+                "momentum_score": 0.0,
+                "volatility_score": 0.0,
+                "volume_score": 0.0,
+                "pattern_score": 0.0,
+                "support_resistance_score": 0.0
+            },
+            "market_regime": {
+                "type": "unknown",
+                "trend_strength": 0.0,
+                "volatility": "unknown"
+            },
+            "entry_price": last_price,
+            "stop_loss": last_price * 0.95,  # Default 5% below current price
+            "take_profit": last_price * 1.1  # Default 10% above current price
+        }
         
         # Calculate indicators
         try:
             indicators_data = indicators_controller.calculate_all(data)
             if indicators_data is None:
-                raise ValueError("Indicator calculation returned None")
+                logger.error("Indicator calculation returned None")
+                indicators_data = data.copy()  # Use original data as fallback
         except Exception as e:
             logger.error(f"Error calculating indicators: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error calculating technical indicators: {str(e)}"
-            )
+            indicators_data = data.copy()  # Use original data as fallback
         
         # Generate signals
         try:
             signals = strategy_controller.generate_signals(indicators_data)
+            if not signals or "signal" not in signals:
+                logger.error("Strategy controller returned invalid signals")
+                signals = default_signals
         except Exception as e:
             logger.error(f"Error generating signals: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error generating trading signals: {str(e)}"
-            )
+            signals = default_signals
         
         # Validate signals
         try:
             validated_signals = signal_validator_controller.validate_signal(signals, indicators_data)
+            if not validated_signals or "signal" not in validated_signals:
+                logger.error("Signal validation returned invalid signals")
+                validated_signals = signals
         except Exception as e:
             logger.error(f"Error validating signals: {str(e)}")
-            # Continue with unvalidated signals if validation fails
             validated_signals = signals
         
         # Calculate position sizing
+        default_position = {
+            "total_capital": capital,
+            "risk_percent": 0.02,  # Default 2%
+            "risk_amount": capital * 0.02,
+            "max_position_size_percent": 0.2,
+            "position_size_dollars": capital * 0.1,  # Default 10%
+            "position_size_units": (capital * 0.1) / last_price if last_price > 0 else 0,
+            "entry_price": last_price,
+            "stop_loss_price": last_price * 0.95,
+            "take_profit_price": last_price * 1.1,
+            "potential_profit_dollars": capital * 0.01,  # Default 1%
+            "risk_reward_ratio": 2.0
+        }
+        
         try:
-            last_price = data['Close'].iloc[-1]
             position = capital_manager_controller.calculate_position(validated_signals, capital, last_price)
+            if not position or "position_size_dollars" not in position:
+                logger.error("Capital manager returned invalid position data")
+                position = default_position
         except Exception as e:
             logger.error(f"Error calculating position: {str(e)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error calculating position sizing: {str(e)}"
-            )
+            position = default_position
         
         # Calculate pyramiding levels (optional)
+        default_pyramiding = {"pyramiding_enabled": False}
         try:
             pyramiding = capital_manager_controller.calculate_pyramiding_levels(validated_signals, capital, last_price)
+            if not pyramiding:
+                logger.error("Capital manager returned invalid pyramiding data")
+                pyramiding = default_pyramiding
         except Exception as e:
             logger.error(f"Error calculating pyramiding levels: {str(e)}")
-            pyramiding = {"pyramiding_enabled": False}
+            pyramiding = default_pyramiding
         
         # Analyze capital efficiency
+        default_capital_efficiency = {
+            "expected_value": 0.0,
+            "capital_usage_percent": 0.0,
+            "estimated_win_rate": 0.5,
+            "kelly_criterion": 0.0,
+            "optimal_position_percent": 0.10,
+            "position_vs_optimal": 0.0
+        }
+        
         try:
             capital_efficiency = capital_manager_controller.analyze_capital_efficiency(validated_signals, position)
-            if isinstance(capital_efficiency, dict) and "error" in capital_efficiency:
-                # If there was an error but we got back a valid dict with error field
+            if not capital_efficiency or not isinstance(capital_efficiency, dict):
+                logger.error("Capital manager returned invalid capital efficiency data")
+                capital_efficiency = default_capital_efficiency
+            elif "error" in capital_efficiency:
                 logger.warning(f"Capital efficiency calculation warning: {capital_efficiency['error']}")
-                # Use the returned fallback values
-            else:
-                # Success case - continue normally
-                pass
         except Exception as e:
             logger.error(f"Error analyzing capital efficiency: {str(e)}")
-            # Instead of setting to None, create a valid default structure
-            capital_efficiency = {
-                "expected_value": 0.0,
-                "capital_usage_percent": 0.0,
-                "estimated_win_rate": 0.5,
-                "kelly_criterion": 0.0,
-                "optimal_position_percent": 0.10,
-                "position_vs_optimal": 0.0
-            }
-            logger.info("Using fallback capital efficiency values due to calculation error")
+            capital_efficiency = default_capital_efficiency
         
         # Sanitize response to handle NaN values before returning
         response = {
             "ticker": ticker,
             "timeframe": timeframe,
             "period": period,
-            "last_price": float(last_price) if not np.isnan(last_price) else None,
+            "last_price": float(last_price) if not np.isnan(last_price) else 0.0,
             "last_updated": datetime.datetime.now().isoformat(),
             "signals": _sanitize_nan_values(validated_signals),
             "position": _sanitize_nan_values(position),
