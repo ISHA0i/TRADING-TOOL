@@ -1,6 +1,14 @@
 import React from 'react';
 
 const CapitalUsageCard = ({ data, symbolType }) => {
+  const hasCapitalEfficiency = data && 
+    data.capital_efficiency && 
+    typeof data.capital_efficiency === 'object' && 
+    !data.capital_efficiency.error;
+  
+  const position = data?.position || {};
+  const capEfficiency = hasCapitalEfficiency ? data.capital_efficiency : null;
+  
   const { ticker, last_price, capital_plan, signals } = data;
   const { 
     total_capital, 
@@ -100,154 +108,106 @@ const CapitalUsageCard = ({ data, symbolType }) => {
 
   return (
     <div className="bg-dark-surface border border-dark-border rounded-lg shadow-lg p-6">
-      <h2 className="text-xl font-semibold mb-4 text-dark-text">Capital Management</h2>
+      <h3 className="text-lg font-semibold mb-4 text-dark-primary border-b border-dark-border pb-2">
+        Capital Management
+      </h3>
       
-      <div className="space-y-6">
-        {/* Position Size */}
-        <div className="bg-dark-surface-2 rounded-lg p-4">
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-dark-text-secondary">Total Capital</span>
-              <span className="font-semibold text-dark-text">{formatMoney(total_capital)}</span>
+      {data ? (
+        <>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div>
+              <p className="text-sm text-dark-text-secondary mb-1">Position Size</p>
+              <p className="text-2xl font-bold text-dark-text">
+                {position.position_size_percent ? `${(position.position_size_percent * 100).toFixed(1)}%` : 'N/A'}
+              </p>
+              <p className="text-xs text-dark-text-secondary">
+                ${position.position_size_value?.toFixed(2) || 'N/A'}
+              </p>
             </div>
             
-            <div className="flex justify-between">
-              <span className="text-dark-text-secondary">Position Size</span>
-              <div className="text-right">
-                <div className="font-semibold text-dark-text">{formatMoney(position_size_usd)}</div>
-                <div className="text-sm text-dark-text-secondary">{formatUnits(position_size_units)}</div>
-              </div>
-            </div>
-            
-            {marketMetrics && (
-              <div className="flex justify-between">
-                <span className="text-dark-text-secondary">
-                  {symbolType === 'forex' ? 'Lot Size' : symbolType === 'crypto' ? 'BTC Value' : ''}
-                </span>
-                <div className="text-right">
-                  <div className="font-semibold text-dark-text">
-                    {symbolType === 'forex' ? (
-                      `${marketMetrics.lotSize} lots`
-                    ) : symbolType === 'crypto' ? (
-                      `${marketMetrics.btcValue} BTC`
-                    ) : null}
-                  </div>
-                  <div className="text-sm text-dark-text-secondary">
-                    {symbolType === 'forex' ? (
-                      `Per pip: ${marketMetrics.pipValue}`
-                    ) : symbolType === 'crypto' ? (
-                      `$${marketMetrics.dollarsPerCoin} per coin`
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Capital Usage Bar with regime-based adjustments */}
-            <div className="pt-2">
-              <div className="flex justify-between mb-1">
-                <span className="text-xs text-dark-text-secondary">Capital Allocation</span>
-                <span className="text-xs text-dark-text-secondary font-semibold">
-                  {formatPercent(capitalUsedPercent)}
-                  {regime_adjustments?.size_adjustment && (
-                    <span className="ml-1 text-xs">
-                      ({regime_adjustments.size_adjustment > 0 ? '+' : ''}
-                      {regime_adjustments.size_adjustment}% regime adj.)
-                    </span>
-                  )}
-                </span>
-              </div>
-              <div className="w-full bg-dark-surface rounded-full h-2">
-                <div 
-                  className={`h-2 rounded-full ${capitalUsedPercent > max_position_size_percent ? 'bg-dark-error' : 'bg-dark-primary'}`}
-                  style={{ width: `${Math.min(100, capitalUsedPercent)}%` }}
-                />
-              </div>
-              <div className="text-xs text-dark-text-secondary mt-1">
-                Max allowed: {formatPercent(max_position_size_percent)}
-              </div>
+            <div>
+              <p className="text-sm text-dark-text-secondary mb-1">Units</p>
+              <p className="text-2xl font-bold text-dark-text">
+                {position.position_size_units?.toFixed(symbolType === 'forex' ? 0 : 2) || 'N/A'}
+              </p>
+              <p className="text-xs text-dark-text-secondary">
+                {symbolType === 'forex' ? 'Currency Units' : 'Shares'}
+              </p>
             </div>
           </div>
-        </div>
-        
-        {/* Risk Parameters */}
-        <div>
-          <h3 className="text-md font-semibold mb-3 text-dark-text">Risk Analysis</h3>
           
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-dark-text-secondary">Risk Amount</span>
-              <div className="text-right">
-                <div className="font-semibold text-red-500">{formatMoney(stop_loss_usd)}</div>
-                <div className="text-sm text-dark-text-secondary">{formatPercent(risk_percent)} of capital</div>
-              </div>
-            </div>
-            
-            <div className="flex justify-between">
-              <span className="text-dark-text-secondary">Potential Profit</span>
-              <div className="text-right">
-                <div className="font-semibold text-green-500">{formatMoney(potential_profit_usd)}</div>
-                <div className="text-sm text-dark-text-secondary">
-                  {formatPercent((potential_profit_usd / total_capital) * 100)} of capital
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex justify-between">
-              <span className="text-dark-text-secondary">Portfolio Risk</span>
-              <span className={`font-semibold ${getRiskColor(portfolio_risk)}`}>
-                {formatPercent(portfolio_risk)}
-              </span>
-            </div>
-            
-            <div className="pt-2 border-t border-dark-border">
-              <h4 className="text-sm font-medium text-dark-text mb-2">Advanced Metrics</h4>
+          {hasCapitalEfficiency ? (
+            <>
+              <hr className="border-dark-border my-4" />
               
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-dark-text-secondary">Kelly Criterion</span>
-                  <span className={`font-medium ${kelly_criterion > 0.5 ? 'text-green-400' : 'text-dark-text'}`}>
-                    {(kelly_criterion * 100).toFixed(1)}%
+              <div className="mb-4">
+                <div className="flex justify-between mb-1">
+                  <span className="text-sm text-dark-text-secondary">Optimal Position</span>
+                  <span className="text-sm font-medium">
+                    {(capEfficiency.optimal_position_percent * 100).toFixed(1)}%
                   </span>
                 </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-dark-text-secondary">Volatility Adjusted Size</span>
-                  <span className="font-medium text-dark-text">
-                    {formatPercent(volatility_adjusted_size)}
-                  </span>
+                <div className="w-full bg-dark-surface-2 rounded-full h-2">
+                  <div 
+                    className="bg-dark-primary h-2 rounded-full" 
+                    style={{ width: `${Math.min(capEfficiency.position_vs_optimal * 100, 100)}%` }}
+                  ></div>
                 </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-dark-text-secondary">Risk/Reward Ratio</span>
-                  <span className={`font-medium ${risk_reward_ratio >= 1.5 ? 'text-green-400' : 'text-yellow-400'}`}>
-                    {risk_reward_ratio.toFixed(2)}:1
+                <div className="flex justify-between mt-1">
+                  <span className="text-xs text-dark-text-secondary">Current: {(position.position_size_percent * 100).toFixed(1)}%</span>
+                  <span className="text-xs text-dark-text-secondary">
+                    {capEfficiency.position_vs_optimal > 1 ? 'Overallocated' : 'Underallocated'}
                   </span>
                 </div>
               </div>
-            </div>
-
-            {/* Market Condition Adjustments */}
-            {market_conditions && Object.keys(market_conditions).length > 0 && (
-              <div className="pt-2 border-t border-dark-border">
-                <h4 className="text-sm font-medium text-dark-text mb-2">Market Conditions</h4>
-                <div className="space-y-2 text-sm">
-                  {Object.entries(market_conditions).map(([key, value]) => (
-                    <div key={key} className="flex justify-between">
-                      <span className="text-dark-text-secondary">
-                        {key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                      </span>
-                      <span className="font-medium text-dark-text">
-                        {typeof value === 'number' ? formatPercent(value * 100) : value}
-                      </span>
-                    </div>
-                  ))}
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-sm text-dark-text-secondary mb-1">Win Rate (est.)</p>
+                  <p className="text-lg font-semibold text-dark-text">
+                    {(capEfficiency.estimated_win_rate * 100).toFixed(1)}%
+                  </p>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-dark-text-secondary mb-1">Kelly Criterion</p>
+                  <p className="text-lg font-semibold text-dark-text">
+                    {(capEfficiency.kelly_criterion * 100).toFixed(1)}%
+                  </p>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-dark-text-secondary mb-1">Expected Value</p>
+                  <p className="text-lg font-semibold text-dark-text">
+                    {capEfficiency.expected_value > 0 ? '+' : ''}{capEfficiency.expected_value.toFixed(2)}
+                  </p>
+                </div>
+                
+                <div>
+                  <p className="text-sm text-dark-text-secondary mb-1">Capital Usage</p>
+                  <p className="text-lg font-semibold text-dark-text">
+                    {(capEfficiency.capital_usage_percent * 100).toFixed(1)}%
+                  </p>
                 </div>
               </div>
-            )}
-          </div>
+            </>
+          ) : (
+            <>
+              <hr className="border-dark-border my-4" />
+              <div className="p-3 bg-dark-surface-2 border border-dark-border rounded-md text-dark-text-secondary">
+                <p className="font-medium">Capital efficiency data not available</p>
+                <p className="text-sm mt-1">
+                  This may be due to insufficient historical data or calculation constraints.
+                </p>
+              </div>
+            </>
+          )}
+        </>
+      ) : (
+        <div className="text-center py-8 text-dark-text-secondary">
+          Loading capital data...
         </div>
-      </div>
+      )}
     </div>
   );
 };

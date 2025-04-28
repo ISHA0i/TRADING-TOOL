@@ -1,50 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { analyzeTicker, checkApiStatus, getUSStocks } from '../api';
+import { analyzeTicker, checkApiStatus, getUSStocks, getForexPairs, getMajorIndices, getIndianStocks, getCryptoPairs, getMarketData } from '../api';
 import SignalCard from '../components/SignalCard';
 import RiskRewardCard from '../components/RiskRewardCard';
 import CapitalUsageCard from '../components/CapitalUsageCard';
-
-// Predefined lists
-const FOREX_PAIRS = [
-  "EUR/USD", "GBP/USD", "USD/JPY", "USD/CHF",
-  "USD/CAD", "AUD/USD", "NZD/USD", "EUR/GBP",
-  "EUR/JPY", "GBP/JPY", "AUD/JPY", "NZD/JPY"
-];
-
-const MAJOR_INDICES = [
-  { symbol: "^GSPC", name: "S&P 500" },
-  { symbol: "^DJI", name: "Dow Jones" },
-  { symbol: "^IXIC", name: "NASDAQ" },
-  { symbol: "^FTSE", name: "FTSE 100" },
-  { symbol: "^BSESN", name: "BSE SENSEX" },
-  { symbol: "^NSEI", name: "NIFTY 50" },
-  { symbol: "^NSEBANK", name: "NIFTY BANK" },
-  { symbol: "^CNXIT", name: "NIFTY IT" },
-  { symbol: "^CNXAUTO", name: "NIFTY AUTO" },
-  { symbol: "^N225", name: "Nikkei 225" },
-  { symbol: "^HSI", name: "Hang Seng" },
-  { symbol: "^GDAXI", name: "DAX" },
-  { symbol: "^FCHI", name: "CAC 40" }
-];
-
-const MAJOR_INDIAN_STOCKS = [
-  { symbol: "RELIANCE.NS", name: "Reliance Industries" },
-  { symbol: "TCS.NS", name: "Tata Consultancy Services" },
-  { symbol: "HDFCBANK.NS", name: "HDFC Bank" },
-  { symbol: "INFY.NS", name: "Infosys" },
-  { symbol: "HINDUNILVR.NS", name: "Hindustan Unilever" },
-  { symbol: "ICICIBANK.NS", name: "ICICI Bank" },
-  { symbol: "SBIN.NS", name: "State Bank of India" },
-  { symbol: "BHARTIARTL.NS", name: "Bharti Airtel" },
-  { symbol: "ITC.NS", name: "ITC Limited" },
-  { symbol: "KOTAKBANK.NS", name: "Kotak Mahindra Bank" }
-];
-
-const CRYPTO_PAIRS = [
-  "BTC-USD", "ETH-USD", "BNB-USD", "XRP-USD",
-  "ADA-USD", "DOGE-USD", "SOL-USD", "DOT-USD",
-  "MATIC-USD", "LINK-USD"
-];
 
 function Home() {
   const [symbolType, setSymbolType] = useState('stock');
@@ -61,21 +19,39 @@ function Home() {
   const [refreshInterval, setRefreshInterval] = useState(60); // in seconds
   const [marketRegion, setMarketRegion] = useState('us'); // Add market region state
   const [usStocks, setUSStocks] = useState({ popular: [], sp500: [] });
+  const [forexPairs, setForexPairs] = useState([]);
+  const [indices, setIndices] = useState([]);
+  const [indianStocks, setIndianStocks] = useState([]);
+  const [cryptoPairs, setCryptoPairs] = useState([]);
   const [loadingStocks, setLoadingStocks] = useState(false);
+  const [loadingSymbols, setLoadingSymbols] = useState(false);
+  const [dataProvider, setDataProvider] = useState('yfinance'); // Default to yfinance
+  const [retryingConnection, setRetryingConnection] = useState(false);
 
-  // Check API status on load
+  // Check API status on load with retry logic
   useEffect(() => {
-    const checkStatus = async () => {
-      try {
-        await checkApiStatus();
-        setApiStatus('connected');
-      } catch (error) {
-        setApiStatus('disconnected');
-      }
-    };
-    
-    checkStatus();
+    checkBackendStatus();
   }, []);
+
+  // Function to check backend status with clearer error reporting
+  const checkBackendStatus = async () => {
+    setApiStatus('checking');
+    setRetryingConnection(true);
+    
+    try {
+      console.log('Checking API connection...');
+      await checkApiStatus();
+      setApiStatus('connected');
+      setError(null); // Clear any previous connection errors
+      console.log('API connection successful');
+    } catch (error) {
+      console.error('API connection failed:', error);
+      setApiStatus('disconnected');
+      setError(`Unable to connect to the backend server. ${error.message}`);
+    } finally {
+      setRetryingConnection(false);
+    }
+  };
 
   // Fetch US stocks when market region changes to US
   useEffect(() => {
@@ -96,18 +72,130 @@ function Home() {
     fetchUSStocks();
   }, [marketRegion, symbolType]);
 
-  // Auto-refresh effect
+  // Fetch Indian stocks when market region changes to India
+  useEffect(() => {
+    const fetchIndianStocks = async () => {
+      if (marketRegion === 'india' && symbolType === 'stock' && indianStocks.length === 0) {
+        setLoadingStocks(true);
+        try {
+          const data = await getIndianStocks();
+          setIndianStocks(data);
+        } catch (error) {
+          console.error('Error fetching Indian stocks:', error);
+          setError('Failed to load Indian stocks list');
+        }
+        setLoadingStocks(false);
+      }
+    };
+
+    fetchIndianStocks();
+  }, [marketRegion, symbolType]);
+
+  // Fetch forex pairs when symbol type changes to forex
+  useEffect(() => {
+    const fetchForexPairs = async () => {
+      if (symbolType === 'forex' && forexPairs.length === 0) {
+        setLoadingSymbols(true);
+        try {
+          const data = await getForexPairs();
+          setForexPairs(data);
+        } catch (error) {
+          console.error('Error fetching forex pairs:', error);
+          setError('Failed to load forex pairs list');
+        }
+        setLoadingSymbols(false);
+      }
+    };
+
+    fetchForexPairs();
+  }, [symbolType]);
+
+  // Fetch indices when symbol type changes to index
+  useEffect(() => {
+    const fetchIndices = async () => {
+      if (symbolType === 'index' && indices.length === 0) {
+        setLoadingSymbols(true);
+        try {
+          const data = await getMajorIndices();
+          setIndices(data);
+        } catch (error) {
+          console.error('Error fetching indices:', error);
+          setError('Failed to load indices list');
+        }
+        setLoadingSymbols(false);
+      }
+    };
+
+    fetchIndices();
+  }, [symbolType]);
+
+  // Fetch crypto pairs when symbol type changes to crypto
+  useEffect(() => {
+    const fetchCryptoPairs = async () => {
+      if (symbolType === 'crypto' && cryptoPairs.length === 0) {
+        setLoadingSymbols(true);
+        try {
+          const data = await getCryptoPairs();
+          setCryptoPairs(data);
+        } catch (error) {
+          console.error('Error fetching crypto pairs:', error);
+          setError('Failed to load cryptocurrency list');
+        }
+        setLoadingSymbols(false);
+      }
+    };
+
+    fetchCryptoPairs();
+  }, [symbolType]);
+  
+  // Auto-refresh effect with data provider
   useEffect(() => {
     let intervalId;
     
     if (autoRefresh && (ticker || customSymbol)) {
       intervalId = setInterval(async () => {
+        const symbolToAnalyze = ticker === 'custom' ? customSymbol : ticker;
+        console.log(`Auto-refreshing ${symbolToAnalyze}...`);
+        
         try {
-          const symbolToAnalyze = ticker === 'custom' ? customSymbol : ticker;
-          const data = await analyzeTicker(symbolToAnalyze, timeframe, period, parseFloat(capital));
+          const data = await analyzeTicker(symbolToAnalyze, timeframe, period, parseFloat(capital), symbolType);
           setAnalysisData(data);
+          setError(null); // Clear any previous errors on successful refresh
         } catch (error) {
           console.error('Auto-refresh error:', error);
+          
+          // Handle capital efficiency errors - try to extract partial data
+          if (error.message.includes("capital_efficiency") || 
+              error.message.includes("division by zero") || 
+              error.message.includes("ResponseValidationError")) {
+            
+            try {
+              // Try to parse the error response for any useful data
+              const errorBody = error.message.split("body=")[1];
+              if (errorBody) {
+                const jsonStart = errorBody.indexOf('{');
+                if (jsonStart >= 0) {
+                  const partialData = JSON.parse(errorBody.substring(jsonStart));
+                  
+                  // Ensure capital_efficiency exists with an error indicator
+                  if (!partialData.capital_efficiency) {
+                    partialData.capital_efficiency = { error: "Calculation failed due to division by zero" };
+                  }
+                  
+                  setAnalysisData(partialData);
+                  setError("Warning: Capital efficiency calculations failed. Some metrics may not be available.");
+                  return;
+                }
+              }
+            } catch (parseError) {
+              console.error("Failed to parse partial data from error:", parseError);
+            }
+          }
+          
+          // Only show connection errors in the UI (don't disrupt user experience too much)
+          if (error.message.includes("Failed to fetch") || error.message.includes("Connection to backend failed")) {
+            setError("Auto-refresh failed: Unable to connect to the server");
+          }
         }
       }, refreshInterval * 1000);
     }
@@ -117,7 +205,7 @@ function Home() {
         clearInterval(intervalId);
       }
     };
-  }, [autoRefresh, ticker, customSymbol, timeframe, period, capital, refreshInterval]);
+  }, [autoRefresh, ticker, customSymbol, timeframe, period, capital, refreshInterval, symbolType, dataProvider]);
 
   const handleSymbolSelect = (e) => {
     const value = e.target.value;
@@ -140,20 +228,80 @@ function Home() {
     try {
       // Use custom symbol if selected, otherwise use the selected ticker
       const symbolToAnalyze = ticker === 'custom' ? customSymbol : ticker;
-      const data = await analyzeTicker(symbolToAnalyze, timeframe, period, parseFloat(capital));
-      setAnalysisData(data);
-      setLoading(false);
+      
+      console.log(`Analyzing ${symbolToAnalyze} with type ${symbolType}, timeframe=${timeframe}, period=${period}`);
+      
+      try {
+        const data = await analyzeTicker(symbolToAnalyze, timeframe, period, parseFloat(capital), symbolType);
+        setAnalysisData(data);
+        setLoading(false);
+      } catch (error) {
+        // Special handling for capital efficiency errors that can still display partial data
+        if (error.message.includes("capital_efficiency") || 
+            error.message.includes("division by zero") || 
+            error.message.includes("ResponseValidationError")) {
+          
+          console.warn("Capital efficiency calculation failed, but continuing with partial data");
+          
+          // Try to extract the partial data from the error if available
+          let partialData = null;
+          try {
+            // Try to parse the error response for any useful data
+            const errorBody = error.message.split("body=")[1];
+            if (errorBody) {
+              const jsonStart = errorBody.indexOf('{');
+              if (jsonStart >= 0) {
+                partialData = JSON.parse(errorBody.substring(jsonStart));
+                
+                // Ensure capital_efficiency exists with an error indicator
+                if (!partialData.capital_efficiency) {
+                  partialData.capital_efficiency = { error: "Calculation failed due to division by zero" };
+                }
+                
+                setAnalysisData(partialData);
+                setError("Warning: Capital efficiency calculations failed. Some metrics may not be available.");
+                setLoading(false);
+                return;
+              }
+            }
+          } catch (parseError) {
+            console.error("Failed to parse partial data from error:", parseError);
+          }
+          
+          // If we couldn't extract data, show a user-friendly error
+          setError("Analysis encountered calculation errors. Try a different symbol or timeframe.");
+        } else if (error.message.includes("Failed to fetch") || error.message.includes("Connection to backend failed")) {
+          setError("Unable to connect to the analysis server. Please ensure the backend is running and accessible.");
+        } else if (error.message.includes("404")) {
+          setError(`Symbol "${symbolToAnalyze}" not found. Please check the symbol and try again.`);
+        } else if (error.message.includes("yfinance")) {
+          setError("Yahoo Finance data retrieval error. Please try a different symbol or check your internet connection.");
+        } else {
+          setError(`Analysis error: ${error.message}`);
+        }
+        
+        setLoading(false);
+      }
     } catch (error) {
-      setError(error.message);
+      console.error("Unexpected error during analysis:", error);
+      setError("An unexpected error occurred. Please try again.");
       setLoading(false);
     }
   };
 
   const getSymbolOptions = () => {
+    // If we're loading, show loading message
+    if (loadingSymbols) {
+      return [<option key="loading" value="" disabled>Loading symbols...</option>];
+    }
+    
     switch (symbolType) {
       case 'stock':
         if (marketRegion === 'india') {
-          return MAJOR_INDIAN_STOCKS.map(stock => (
+          if (indianStocks.length === 0) {
+            return [<option key="empty" value="" disabled>No stocks available</option>];
+          }
+          return indianStocks.map(stock => (
             <option key={stock.symbol} value={stock.symbol}>{stock.name} ({stock.symbol})</option>
           ));
         } else if (marketRegion === 'us') {
@@ -176,16 +324,25 @@ function Home() {
         }
         return [];
       case 'forex':
-        return FOREX_PAIRS.map(pair => (
-          <option key={pair} value={pair}>{pair}</option>
+        if (forexPairs.length === 0) {
+          return [<option key="empty" value="" disabled>No forex pairs available</option>];
+        }
+        return forexPairs.map(pair => (
+          <option key={pair.symbol} value={pair.symbol}>{pair.name}</option>
         ));
       case 'index':
-        return MAJOR_INDICES.map(index => (
+        if (indices.length === 0) {
+          return [<option key="empty" value="" disabled>No indices available</option>];
+        }
+        return indices.map(index => (
           <option key={index.symbol} value={index.symbol}>{index.name} ({index.symbol})</option>
         ));
       case 'crypto':
-        return CRYPTO_PAIRS.map(pair => (
-          <option key={pair} value={pair}>{pair}</option>
+        if (cryptoPairs.length === 0) {
+          return [<option key="empty" value="" disabled>No cryptocurrencies available</option>];
+        }
+        return cryptoPairs.map(pair => (
+          <option key={pair.symbol} value={pair.symbol}>{pair.name}</option>
         ));
       default:
         return []; // For stocks, we'll use the custom input
@@ -197,8 +354,27 @@ function Home() {
       <main className="container mx-auto px-4 py-6">
         {apiStatus !== 'connected' && (
           <div className="mb-6 p-4 bg-dark-surface border-l-4 border-dark-error text-dark-text">
-            <p className="font-bold">Backend API {apiStatus}</p>
-            <p>Make sure the Python backend is running on http://localhost:8000</p>
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="font-bold">Backend API {apiStatus}</p>
+                <p>Make sure the Python backend is running on http://localhost:8000 or http://127.0.0.1:8000</p>
+                <p className="text-xs mt-1">Check your terminal for the correct URL where the backend is running.</p>
+              </div>
+              <button
+                onClick={checkBackendStatus}
+                disabled={retryingConnection}
+                className="px-4 py-2 bg-dark-primary text-dark-text rounded hover:bg-opacity-90 disabled:opacity-50"
+              >
+                {retryingConnection ? 'Checking...' : 'Retry Connection'}
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {error && apiStatus === 'connected' && (
+          <div className="mb-6 p-4 bg-dark-surface border-l-4 border-dark-warning text-dark-text">
+            <p className="font-bold">Warning</p>
+            <p>{error}</p>
           </div>
         )}
         
@@ -282,12 +458,17 @@ function Home() {
                   </div>
                 ) : (
                   <select
-                    className="w-full p-2 bg-dark-surface-2 border border-dark-border rounded-md text-dark-text focus:border-dark-primary focus:ring-dark-primary"
+                    className="w-full p-2 bg-dark-surface-2 border border-dark-border rounded-md text-dark-text focus:border-dark-primary focus:ring-dark-primary disabled:opacity-50"
                     value={ticker}
                     onChange={handleSymbolSelect}
                     required
+                    disabled={loadingSymbols}
                   >
-                    <option value="">Select {symbolType === 'forex' ? 'a pair' : symbolType === 'crypto' ? 'a cryptocurrency' : 'an index'}</option>
+                    <option value="">
+                      {loadingSymbols 
+                        ? `Loading ${symbolType === 'forex' ? 'forex pairs' : symbolType === 'crypto' ? 'cryptocurrencies' : 'indices'}...` 
+                        : `Select ${symbolType === 'forex' ? 'a pair' : symbolType === 'crypto' ? 'a cryptocurrency' : 'an index'}`}
+                    </option>
                     {getSymbolOptions()}
                   </select>
                 )}
@@ -345,6 +526,13 @@ function Home() {
                   placeholder="10000"
                   min="100"
                 />
+              </div>
+
+              {/* Add note about data source */}
+              <div className="lg:col-span-4 mt-2">
+                <div className="text-xs text-dark-text-secondary bg-dark-surface-2 p-2 rounded">
+                  <span className="font-semibold">Note:</span> Data for crypto, forex, and US markets is provided by Yahoo Finance (yfinance).
+                </div>
               </div>
             </div>
             
@@ -416,7 +604,7 @@ function Home() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <SignalCard data={analysisData} />
+              <SignalCard data={analysisData} symbolType={symbolType} />
               <RiskRewardCard data={analysisData} symbolType={symbolType} />
               <CapitalUsageCard data={analysisData} symbolType={symbolType} />
             </div>

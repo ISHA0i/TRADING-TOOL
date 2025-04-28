@@ -1,280 +1,132 @@
 import React from 'react';
 
 const RiskRewardCard = ({ data, symbolType }) => {
-  const { ticker, last_price, signals } = data;
-  const { 
-    signal, 
-    entry_price, 
-    stop_loss, 
-    take_profit, 
-    support_levels, 
-    resistance_levels,
-    market_regime,
-    validation
-  } = signals;
-  
-  // Determine signal strength and market conditions
-  const isBuySignal = signal.includes('BUY');
-  const isStrongSignal = signal.includes('STRONG');
-  const isVolatile = market_regime?.volatility === 'high';
-  const mainColor = isBuySignal ? 'green' : signal.includes('SELL') ? 'red' : 'gray';
-  
-  // Calculate risk/reward metrics with market context
-  const calculateMetrics = () => {
-    if (!stop_loss || !take_profit || !entry_price) {
-      const missingValues = [];
-      if (!entry_price) missingValues.push('entry price');
-      if (!stop_loss) missingValues.push('stop loss');
-      if (!take_profit) missingValues.push('take profit');
-      
-      return {
-        rr_ratio: null,
-        stopLossPercent: null,
-        takeProfitPercent: null,
-        pipRisk: null,
-        pipReward: null,
-        pipValue: null,
-        missingValues
-      };
-    }
-    
-    const risk = Math.abs(entry_price - stop_loss);
-    const reward = Math.abs(entry_price - take_profit);
-    let rr_ratio = risk === 0 ? 0 : reward / risk;
-    
-    // Adjust R:R ratio based on market conditions
-    if (isVolatile) {
-      rr_ratio *= 0.8; // Reduce expected reward in high volatility
-    }
-    if (isStrongSignal && validation?.regime_compatibility > 0) {
-      rr_ratio *= 1.2; // Increase expected reward for strong signals in compatible regime
-    }
-    
-    // Calculate potential profit/loss percentages
-    const stopLossPercent = ((stop_loss - entry_price) / entry_price) * 100;
-    const takeProfitPercent = ((take_profit - entry_price) / entry_price) * 100;
-    
-    // Calculate pip values for forex
-    let pipValue = 0;
-    let pipRisk = 0;
-    let pipReward = 0;
-    
-    if (symbolType === 'forex') {
-      const isJPYPair = ticker.includes('JPY');
-      const pipMultiplier = isJPYPair ? 100 : 10000;
-      
-      pipValue = Math.pow(10, -4);
-      if (isJPYPair) pipValue = 0.01;
-      
-      pipRisk = Math.abs(entry_price - stop_loss) * pipMultiplier;
-      pipReward = Math.abs(entry_price - take_profit) * pipMultiplier;
-    }
-    
-    return {
-      rr_ratio,
-      stopLossPercent,
-      takeProfitPercent,
-      pipRisk,
-      pipReward,
-      pipValue
-    };
-  };
+  if (!data || !data.position || !data.signals) {
+    return (
+      <div className="bg-dark-surface border border-dark-border rounded-lg shadow-lg p-6">
+        <h3 className="text-lg font-semibold mb-4 text-dark-primary border-b border-dark-border pb-2">
+          Risk/Reward Analysis
+        </h3>
+        <div className="text-center py-8 text-dark-text-secondary">
+          No risk/reward data available
+        </div>
+      </div>
+    );
+  }
 
-  const metrics = calculateMetrics();
+  const { ticker, last_price } = data;
+  const { position_size_value = 0, risk_amount = 0, reward_amount = 0 } = data.position;
   
-  // Update formatPrice function to handle price precision
+  // Calculate risk-reward ratio
+  const riskRewardRatio = risk_amount && reward_amount 
+    ? (reward_amount / risk_amount).toFixed(2) 
+    : 'N/A';
+  
+  // Get color based on risk-reward ratio
+  const getRatioColor = (ratio) => {
+    if (ratio === 'N/A') return 'text-dark-text-secondary';
+    const numRatio = parseFloat(ratio);
+    if (numRatio >= 3) return 'text-green-500';
+    if (numRatio >= 2) return 'text-green-400';
+    if (numRatio >= 1) return 'text-yellow-500';
+    return 'text-red-500';
+  };
+  
+  // Calculate percentage of investment
+  const riskPercent = position_size_value ? (risk_amount / position_size_value) * 100 : 0;
+  const rewardPercent = position_size_value ? (reward_amount / position_size_value) * 100 : 0;
+  
+  // Format price according to symbol type (yfinance convention)
   const formatPrice = (price) => {
-    if (!price) return 'N/A';
+    if (price === undefined || price === null) return 'N/A';
     
     if (symbolType === 'crypto') {
-      return price < 1 ? price.toFixed(6) : price.toFixed(2);
+      // For cryptocurrencies, format with more decimal places for small values
+      if (price < 1) return price.toFixed(6);
+      if (price < 10) return price.toFixed(4);
+      return price.toFixed(2);
     } else if (symbolType === 'forex') {
-      const isJPYPair = ticker.includes('JPY');
-      return isJPYPair ? price.toFixed(3) : price.toFixed(5);
+      // For forex, typically 4 decimal places (or 2 for JPY pairs)
+      const isJPYPair = ticker && (ticker.includes('JPY') || ticker.includes('USDJPY'));
+      return isJPYPair ? price.toFixed(2) : price.toFixed(4);
     }
+    
+    // Default format for stocks and indices
     return price.toFixed(2);
   };
   
-  // Format percentage with dynamic coloring
-  const formatPercent = (value) => {
-    if (!value) return 'N/A';
-    
-    const color = value > 0 ? 'text-green-400' : value < 0 ? 'text-red-400' : 'text-dark-text';
-    return (
-      <span className={color}>
-        {value > 0 ? '+' : ''}{value.toFixed(2)}%
-        {isVolatile && '⚠️'}
-      </span>
-    );
-  };
-  
-  // Get dynamic warning messages based on analysis
-  const getWarnings = () => {
-    const warnings = [];
-    
-    // Add missing values warning first
-    if (metrics.missingValues?.length > 0) {
-      warnings.push(`Missing required values: ${metrics.missingValues.join(', ')}`);
-    }
-    
-    if (isVolatile) {
-      warnings.push('High volatility - consider reducing position size');
-    }
-    if (metrics.rr_ratio && metrics.rr_ratio < 1.5) {
-      warnings.push('Risk-reward ratio below recommended 1.5:1');
-    }
-    if (validation?.warning_flags) {
-      warnings.push(...validation.warning_flags);
-    }
-    
-    return warnings;
-  };
-
   return (
     <div className="bg-dark-surface border border-dark-border rounded-lg shadow-lg p-6">
-      <h2 className="text-xl font-semibold mb-4 text-dark-text">Risk / Reward Analysis</h2>
+      <h3 className="text-lg font-semibold mb-4 text-dark-primary border-b border-dark-border pb-2">
+        Risk/Reward Analysis
+      </h3>
       
-      <div className="space-y-6">
-        {/* Entry, Stop Loss, Target */}
-        <div className="bg-dark-surface-2 rounded-lg p-4">
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-dark-text-secondary">Entry Price</span>
-              <span className="font-semibold text-dark-text">{formatPrice(entry_price)}</span>
-            </div>
-            
-            <div className="flex justify-between">
-              <span className="text-dark-text-secondary">Current Price</span>
-              <div className="text-right">
-                <span className="font-semibold text-dark-text">{formatPrice(last_price)}</span>
-                {last_price !== entry_price && (
-                  <div className="text-sm">
-                    {formatPercent(((last_price - entry_price) / entry_price) * 100)}
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            {stop_loss && (
-              <div className="flex justify-between">
-                <span className="text-dark-text-secondary">Stop Loss</span>
-                <div className="text-right">
-                  <div className="font-semibold text-red-500">
-                    {formatPrice(stop_loss)}
-                  </div>
-                  <div className="text-sm text-red-400">
-                    {formatPercent(metrics.stopLossPercent)}
-                    {symbolType === 'forex' && ` (${metrics.pipRisk.toFixed(1)} pips)`}
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {take_profit && (
-              <div className="flex justify-between">
-                <span className="text-dark-text-secondary">Take Profit</span>
-                <div className="text-right">
-                  <div className="font-semibold text-green-500">
-                    {formatPrice(take_profit)}
-                  </div>
-                  <div className="text-sm text-green-400">
-                    {formatPercent(metrics.takeProfitPercent)}
-                    {symbolType === 'forex' && ` (${metrics.pipReward.toFixed(1)} pips)`}
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            <div className="border-t border-dark-border pt-2 mt-2">
-              <div className="flex justify-between">
-                <span className="text-dark-text-secondary">Risk/Reward Ratio</span>
-                <div className="text-right">
-                  <span className={`font-bold ${metrics.rr_ratio >= 1.5 ? 'text-green-400' : metrics.rr_ratio ? 'text-yellow-400' : 'text-dark-text-secondary'}`}>
-                    {metrics.rr_ratio ? `${metrics.rr_ratio.toFixed(2)}:1` : 'N/A'}
-                  </span>
-                  {metrics.missingValues?.length > 0 && (
-                    <div className="text-xs text-dark-text-secondary">
-                      Missing: {metrics.missingValues.join(', ')}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+      <div className="mb-6 text-center">
+        <p className="text-sm text-dark-text-secondary mb-1">Risk/Reward Ratio</p>
+        <p className={`text-3xl font-bold ${getRatioColor(riskRewardRatio)}`}>
+          {riskRewardRatio}:1
+        </p>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-5 mb-5">
+        <div>
+          <p className="text-sm text-dark-text-secondary mb-1">Potential Loss</p>
+          <p className="text-xl font-bold text-red-500">
+            ${formatPrice(risk_amount)}
+          </p>
+          <p className="text-xs text-dark-text-secondary">
+            {riskPercent.toFixed(1)}% of position
+          </p>
         </div>
         
-        {/* Warning Messages */}
-        {getWarnings().length > 0 && (
-          <div className="bg-yellow-400/10 border border-yellow-400/20 rounded-lg p-3">
-            <h4 className="text-sm font-medium text-yellow-400 mb-2">Risk Warnings</h4>
-            <ul className="list-disc pl-5 space-y-1">
-              {getWarnings().map((warning, index) => (
-                <li key={index} className="text-yellow-400/90 text-sm">{warning}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        
-        {/* Support & Resistance Levels */}
         <div>
-          <h3 className="text-md font-semibold mb-2 text-dark-text">Key Price Levels</h3>
-          <div className="space-y-3">
-            {/* Resistance Levels */}
-            <div>
-              <h4 className="text-sm text-dark-text-secondary mb-1">Resistance</h4>
-              <div className="flex flex-wrap gap-2">
-                {resistance_levels && resistance_levels.length > 0 ? (
-                  resistance_levels.map((level, index) => {
-                    const priceDiff = ((level - last_price) / last_price) * 100;
-                    const isNearby = Math.abs(priceDiff) < 1;
-                    return (
-                      <div 
-                        key={index}
-                        className={`bg-dark-surface-2 border ${isNearby ? 'border-red-500' : 'border-red-500/20'} rounded p-2`}
-                      >
-                        <div className="text-red-400 font-medium">
-                          {formatPrice(level)}
-                        </div>
-                        <div className="text-xs text-red-500">
-                          {formatPercent(priceDiff)}
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <span className="text-dark-text-secondary text-sm">No levels detected</span>
-                )}
-              </div>
-            </div>
-
-            {/* Support Levels */}
-            <div>
-              <h4 className="text-sm text-dark-text-secondary mb-1">Support</h4>
-              <div className="flex flex-wrap gap-2">
-                {support_levels && support_levels.length > 0 ? (
-                  support_levels.map((level, index) => {
-                    const priceDiff = ((level - last_price) / last_price) * 100;
-                    const isNearby = Math.abs(priceDiff) < 1;
-                    return (
-                      <div 
-                        key={index}
-                        className={`bg-dark-surface-2 border ${isNearby ? 'border-green-500' : 'border-green-500/20'} rounded p-2`}
-                      >
-                        <div className="text-green-400 font-medium">
-                          {formatPrice(level)}
-                        </div>
-                        <div className="text-xs text-green-500">
-                          {formatPercent(priceDiff)}
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <span className="text-dark-text-secondary text-sm">No levels detected</span>
-                )}
-              </div>
-            </div>
-          </div>
+          <p className="text-sm text-dark-text-secondary mb-1">Potential Gain</p>
+          <p className="text-xl font-bold text-green-500">
+            ${formatPrice(reward_amount)}
+          </p>
+          <p className="text-xs text-dark-text-secondary">
+            {rewardPercent.toFixed(1)}% of position
+          </p>
+        </div>
+      </div>
+      
+      <div className="relative pt-1">
+        <div className="flex justify-between mb-1 text-xs text-dark-text-secondary">
+          <span>Risk</span>
+          <span>Current</span>
+          <span>Target</span>
+        </div>
+        <div className="h-2 bg-dark-surface-2 rounded-full">
+          <div className="absolute top-0 h-6 w-0.5 bg-dark-border" style={{ left: '50%', marginTop: '18px' }}></div>
+          {data.position.stop_price && (
+            <div 
+              className="absolute top-0 h-6 w-0.5 bg-red-500" 
+              style={{ 
+                left: `${25}%`, 
+                marginTop: '18px'
+              }}
+            ></div>
+          )}
+          {data.position.target_price && (
+            <div 
+              className="absolute top-0 h-6 w-0.5 bg-green-500" 
+              style={{ 
+                left: `${75}%`, 
+                marginTop: '18px'
+              }}
+            ></div>
+          )}
+        </div>
+        <div className="flex justify-between mt-1 text-xs">
+          <span className="text-red-500">
+            ${formatPrice(data.position.stop_price)}
+          </span>
+          <span className="text-dark-text">
+            ${formatPrice(last_price)}
+          </span>
+          <span className="text-green-500">
+            ${formatPrice(data.position.target_price)}
+          </span>
         </div>
       </div>
     </div>
